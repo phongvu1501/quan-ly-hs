@@ -1,186 +1,66 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Permissions')
+@section('title', 'Quyền truy cập')
 
 @section('content')
-
-<div class="d-flex justify-content-between mb-4">
-
-    <h2>Permissions</h2>
-
-
-    {{-- ==========================================================
-         THÊM PERMISSION
-         Chỉ hiện khi có permissions.create
-         ========================================================== --}}
-
-    @if(auth()->user()->hasPermission('permissions.create'))
-
-        <a
-            href="{{ route('admin.permissions.create') }}"
-            class="btn btn-primary"
-            data-modal-title="Thêm Permission">
-
-            + Thêm Permission
-
-        </a>
-
-    @endif
-
-</div>
-
-
-<div class="card">
-
-    <div class="card-body">
-
-        <table class="table table-hover">
-
-            <thead>
-
-                <tr>
-
-                    <th>ID</th>
-
-                    <th>Tên</th>
-
-                    <th>Slug</th>
-
-                    <th>Số Role</th>
-
-                    <th>Thao tác</th>
-
-                </tr>
-
-            </thead>
-
-
-            <tbody>
-
-            @forelse($permissions as $permission)
-
-                <tr>
-
-                    <td>
-                        {{ $permission->id }}
-                    </td>
-
-
-                    <td>
-                        {{ $permission->name }}
-                    </td>
-
-
-                    <td>
-
-                        <code>
-                            {{ $permission->slug }}
-                        </code>
-
-                    </td>
-
-
-                    <td>
-                        {{ $permission->roles_count }}
-                    </td>
-
-
-                    <td>
-
-
-                        {{-- ==================================================
-                             SỬA PERMISSION
-                             ================================================== --}}
-
-                        @if(auth()->user()->hasPermission('permissions.edit'))
-
-                            <a
-                                href="{{ route('admin.permissions.edit', $permission) }}"
-                                class="btn btn-sm btn-warning"
-                                data-modal-title="Cập nhật Permission">
-
-                                Sửa
-
-                            </a>
-
-                        @endif
-
-
-                        {{-- ==================================================
-                             XÓA PERMISSION
-                             ================================================== --}}
-
-                        @if(auth()->user()->hasPermission('permissions.delete'))
-
-                            <form
-                                action="{{ route('admin.permissions.destroy', $permission) }}"
-                                method="POST"
-                                class="d-inline"
-                                onsubmit="return confirm('Xóa permission này?')">
-
-                                @csrf
-
-                                @method('DELETE')
-
-                                <button
-                                    type="submit"
-                                    class="btn btn-sm btn-danger">
-
-                                    Xóa
-
-                                </button>
-
-                            </form>
-
-                        @endif
-
-
-                        {{-- ==================================================
-                             KHÔNG CÓ QUYỀN THAO TÁC
-                             ================================================== --}}
-
-                        @if(
-                            !auth()->user()->hasPermission('permissions.edit')
-                            &&
-                            !auth()->user()->hasPermission('permissions.delete')
-                        )
-
-                            <span class="text-muted">
-                                Không có thao tác
-                            </span>
-
-                        @endif
-
-
-                    </td>
-
-                </tr>
-
-            @empty
-
-                <tr>
-
-                    <td
-                        colspan="5"
-                        class="text-center text-muted">
-
-                        Chưa có permission
-
-                    </td>
-
-                </tr>
-
-            @endforelse
-
-            </tbody>
-
-        </table>
-
-
-        {{ $permissions->links() }}
-
+    <div class="page-heading page-heading-inline">
+        <div>
+            <p class="eyebrow">RBAC</p>
+            <h1>Quyền truy cập</h1>
+            <p class="text-secondary mb-0">Permission kiểm soát route và các thao tác được hiển thị.</p>
+        </div>
+        @if (auth()->user()->hasPermission('permissions.create'))
+            <a href="{{ route('admin.permissions.create') }}" class="btn btn-primary" data-modal-title="Thêm permission"><i
+                    data-lucide="plus"></i> Thêm permission</a>
+        @endif
     </div>
 
-</div>
-
+    <div class="card table-card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Permission</th>
+                        <th>Slug</th>
+                        <th>Mô tả</th>
+                        <th>Số role</th>
+                        <th class="text-end">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($permissions as $permission)
+                        <tr>
+                            <td><strong>{{ $permission->name }}</strong></td>
+                            <td><code>{{ $permission->slug }}</code></td>
+                            <td class="text-secondary">{{ $permission->description ?: '-' }}</td>
+                            <td>{{ $permission->roles_count }}</td>
+                            <td class="text-end">
+                                @if (auth()->user()->hasPermission('permissions.edit'))
+                                    <a href="{{ route('admin.permissions.edit', $permission) }}"
+                                        class="btn btn-sm btn-light" data-modal-title="Sửa permission" title="Sửa"><i
+                                            data-lucide="pencil"></i></a>
+                                @endif
+                                @if (auth()->user()->hasPermission('permissions.delete'))
+                                    <form action="{{ route('admin.permissions.destroy', $permission) }}" method="POST"
+                                        class="d-inline" data-modal-title="Xóa permission"
+                                        data-confirm="Bạn có chắc muốn xóa permission này không?">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-sm btn-outline-danger" title="Xoá"><i
+                                                data-lucide="trash-2"></i></button>
+                                    </form>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="empty-state">Chưa có permission.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if ($permissions->hasPages())
+            <div class="p-3 border-top">{{ $permissions->links('pagination::bootstrap-5') }}</div>
+        @endif
+    </div>
 @endsection

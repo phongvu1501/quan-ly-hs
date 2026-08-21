@@ -1,233 +1,77 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Quản lý Menu')
+@section('title', 'Điều hướng')
 
 @section('content')
-
-<div class="d-flex justify-content-between mb-4">
-
-    <h2>Quản lý Menu</h2>
-
-
-    {{-- ==========================================================
-         THÊM MENU
-         Chỉ hiển thị khi có menus.create
-         ========================================================== --}}
-
-    @if(auth()->user()->hasPermission('menus.create'))
-
-        <a
-            href="{{ route('admin.menus.create') }}"
-            class="btn btn-primary"
-            data-modal-title="Thêm Menu">
-
-            + Thêm Menu
-
-        </a>
-
-    @endif
-
-</div>
-
-
-<div class="card">
-
-    <div class="card-body">
-
-        <table class="table table-hover align-middle">
-
-            <thead>
-
-                <tr>
-
-                    <th>ID</th>
-
-                    <th>Tên</th>
-
-                    <th>Slug</th>
-
-                    <th>Route</th>
-
-                    <th>Menu cha</th>
-
-                    <th>Thứ tự</th>
-
-                    <th>Trạng thái</th>
-
-                    <th>Thao tác</th>
-
-                </tr>
-
-            </thead>
-
-
-            <tbody>
-
-            @forelse($menus as $menu)
-
-                <tr>
-
-                    <td>
-                        {{ $menu->id }}
-                    </td>
-
-
-                    <td>
-
-                        @if($menu->parent)
-
-                            └─
-
-                        @endif
-
-                        {{ $menu->name }}
-
-                    </td>
-
-
-                    <td>
-
-                        {{ $menu->slug }}
-
-                    </td>
-
-
-                    <td>
-
-                        <code>
-                            {{ $menu->route ?? '-' }}
-                        </code>
-
-                    </td>
-
-
-                    <td>
-
-                        {{ $menu->parent->name ?? 'Menu gốc' }}
-
-                    </td>
-
-
-                    <td>
-
-                        {{ $menu->sort_order }}
-
-                    </td>
-
-
-                    <td>
-
-                        @if($menu->is_active)
-
-                            <span class="badge bg-success">
-                                Active
-                            </span>
-
-                        @else
-
-                            <span class="badge bg-secondary">
-                                Disabled
-                            </span>
-
-                        @endif
-
-                    </td>
-
-
-                    <td>
-
-
-                        {{-- ==================================================
-                             SỬA MENU
-                             ================================================== --}}
-
-                        @if(auth()->user()->hasPermission('menus.edit'))
-
-                            <a
-                                href="{{ route('admin.menus.edit', $menu) }}"
-                                class="btn btn-sm btn-warning"
-                                data-modal-title="Cập nhật Menu">
-
-                                Sửa
-
-                            </a>
-
-                        @endif
-
-
-                        {{-- ==================================================
-                             XÓA MENU
-                             ================================================== --}}
-
-                        @if(auth()->user()->hasPermission('menus.delete'))
-
-                            <form
-                                action="{{ route('admin.menus.destroy', $menu) }}"
-                                method="POST"
-                                class="d-inline"
-                                onsubmit="return confirm('Xóa menu này?')">
-
-                                @csrf
-
-                                @method('DELETE')
-
-                                <button
-                                    type="submit"
-                                    class="btn btn-sm btn-danger">
-
-                                    Xóa
-
-                                </button>
-
-                            </form>
-
-                        @endif
-
-
-                        {{-- Nếu không có quyền sửa và xóa --}}
-
-                        @if(
-                            !auth()->user()->hasPermission('menus.edit')
-                            &&
-                            !auth()->user()->hasPermission('menus.delete')
-                        )
-
-                            <span class="text-muted">
-                                Không có thao tác
-                            </span>
-
-                        @endif
-
-
-                    </td>
-
-                </tr>
-
-            @empty
-
-                <tr>
-
-                    <td
-                        colspan="8"
-                        class="text-center text-muted">
-
-                        Chưa có menu
-
-                    </td>
-
-                </tr>
-
-            @endforelse
-
-            </tbody>
-
-        </table>
-
-
-        {{ $menus->links() }}
-
+    <div class="page-heading page-heading-inline">
+        <div>
+            <p class="eyebrow">Cấu hình hệ thống</p>
+            <h1>Điều hướng</h1>
+            <p class="text-secondary mb-0">Menu cha/con trong DB sẽ tự dựng thành cây ở sidebar.</p>
+        </div>
+        @if (auth()->user()->hasPermission('menus.create'))
+            <a href="{{ route('admin.menus.create') }}" class="btn btn-primary" data-modal-title="Thêm menu"><i
+                    data-lucide="plus"></i> Thêm menu</a>
+        @endif
     </div>
 
-</div>
-
+    <div class="card table-card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Menu</th>
+                        <th>Slug</th>
+                        <th>Route</th>
+                        <th>Quyền cần có</th>
+                        <th>Trạng thái</th>
+                        <th class="text-end">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($menus as $menu)
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center gap-2"
+                                    style="padding-left: {{ $menu->parent_id ? '24px' : '0' }}">
+                                    @if ($menu->parent_id)
+                                    <span class="text-secondary">↳</span>@else<i data-lucide="folder-tree"
+                                            class="text-primary"></i>
+                                    @endif
+                                    <strong>{{ $menu->name }}</strong>
+                                </div>
+                            </td>
+                            <td><code>{{ $menu->slug }}</code></td>
+                            <td><code>{{ $menu->route ?: 'CRUD động' }}</code></td>
+                            <td>{{ $menu->required_permission ?: 'Gán trực tiếp theo role' }}</td>
+                            <td><span
+                                    class="status-dot {{ $menu->is_active ? 'status-on' : 'status-off' }}">{{ $menu->is_active ? 'Đang hiển thị' : 'Đã tắt' }}</span>
+                            </td>
+                            <td class="text-end">
+                                @if (auth()->user()->hasPermission('menus.edit'))
+                                    <a href="{{ route('admin.menus.edit', $menu) }}" class="btn btn-sm btn-light"
+                                        data-modal-title="Sửa menu" title="Sửa"><i data-lucide="pencil"></i></a>
+                                @endif
+                                @if (auth()->user()->hasPermission('menus.delete'))
+                                    <form action="{{ route('admin.menus.destroy', $menu) }}" method="POST" class="d-inline"
+                                        data-modal-title="Xóa menu" data-confirm="Bạn có chắc muốn xóa menu này không?">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-sm btn-outline-danger" title="Xoá"><i
+                                                data-lucide="trash-2"></i></button>
+                                    </form>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="empty-state">Chưa có menu.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if ($menus->hasPages())
+            <div class="p-3 border-top">{{ $menus->links('pagination::bootstrap-5') }}</div>
+        @endif
+    </div>
 @endsection

@@ -48,7 +48,11 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            return redirect()->route('dashboard');
+            if (Auth::user()->must_change_password) {
+                return redirect()->route('profile.show')->with('warning', 'Bạn phải đổi mật khẩu mặc định trước khi sử dụng hệ thống.');
+            }
+
+            return redirect()->to($this->dashboardUrl(Auth::user()));
         }
 
         return back()
@@ -66,5 +70,36 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    public function dashboardUrl(?User $user = null): string
+    {
+        $user ??= auth()->user();
+
+        if ($user->hasRole('admin') || $user->hasPermission('admin.access')) {
+            return route('admin.school.dashboard');
+        }
+
+        if ($user->hasRole('homeroom_teacher') && $user->teacherProfile) {
+            return route('teacher.homeroom.dashboard');
+        }
+
+        if ($user->hasRole('subject_teacher') && $user->teacherProfile) {
+            return route('teacher.subject.dashboard');
+        }
+
+        if ($user->hasRole('teacher') && $user->teacherProfile) {
+            return route('teacher.subject.dashboard');
+        }
+
+        if ($user->hasRole('student') && $user->studentProfile) {
+            return route('student.dashboard');
+        }
+
+        if ($user->hasRole('homeroom_teacher') || $user->hasRole('subject_teacher') || $user->hasRole('teacher') || $user->hasRole('student')) {
+            return route('profile.show');
+        }
+
+        return route('dashboard');
     }
 }

@@ -1,19 +1,331 @@
 ﻿<!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tạo tài khoản | Quần Áo Shop</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        :root { --ink:#172033; --muted:#687385; --line:#dfe6ee; --canvas:#f4f7f9; --accent:#167c80; --accent-dark:#106b6e; --danger:#b42318; } * { box-sizing:border-box; } body { min-width:320px; min-height:100vh; margin:0; background:var(--canvas); color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }.shell { display:grid; min-height:100vh; grid-template-columns:minmax(0,1.05fr) minmax(420px,.95fr); }.intro { display:flex; flex-direction:column; justify-content:space-between; padding:48px 9%; background:#172033; color:#f7fafc; }.brand { display:flex; align-items:center; gap:11px; font-size:16px; font-weight:700; }.brand-mark,.point-icon { display:grid; place-items:center; border-radius:8px; background:#167c80; }.brand-mark { width:36px; height:36px; }.brand-mark svg { width:19px; }.intro-copy { max-width:470px; margin:80px 0; }.eyebrow { margin:0 0 16px; color:#8ed7d3; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }h1 { margin:0 0 18px; font-size:42px; line-height:1.12; }.intro-copy p:last-child { max-width:390px; margin:0; color:#b9c5d5; font-size:16px; line-height:1.65; }.points { display:grid; gap:17px; }.point { display:flex; align-items:center; gap:12px; color:#cdd6e2; font-size:14px; }.point-icon { width:30px; height:30px; background:#27344a; color:#8ed7d3; }.point-icon svg { width:16px; }.form-side { display:flex; align-items:center; justify-content:center; padding:36px; background:#fff; }.form-card { width:100%; max-width:390px; }.heading { margin-bottom:26px; }.heading h2 { margin:0 0 8px; font-size:28px; }.heading p { margin:0; color:var(--muted); font-size:14px; }.notice { margin-bottom:18px; padding:12px 14px; border:1px solid #f2c5c2; border-radius:6px; background:#fff5f4; color:var(--danger); font-size:14px; line-height:1.45; }.field { margin-bottom:15px; }label { display:block; margin-bottom:7px; font-size:14px; font-weight:650; }.input-wrap { position:relative; }.input-wrap svg { position:absolute; top:50%; left:13px; width:18px; color:#7b8798; transform:translateY(-50%); }input { width:100%; height:46px; padding:0 13px 0 43px; border:1px solid var(--line); border-radius:6px; outline:0; color:var(--ink); font:inherit; font-size:14px; }input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(22,124,128,.12); }.submit { width:100%; height:46px; margin-top:23px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }.submit:hover { background:var(--accent-dark); }.footer { margin:24px 0 0; color:var(--muted); font-size:14px; text-align:center; }.footer a { color:var(--accent); font-weight:700; text-decoration:none; }@media (max-width:800px) { .shell { grid-template-columns:1fr; }.intro { display:none; }.form-side { min-height:100vh; } } @media (max-width:440px) { .form-side { padding:24px 20px; }.heading h2 { font-size:24px; } }
+        :root {
+            --ink: #172033;
+            --muted: #687385;
+            --line: #dfe6ee;
+            --canvas: #f4f7f9;
+            --accent: #167c80;
+            --accent-dark: #106b6e;
+            --danger: #b42318;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-width: 320px;
+            min-height: 100vh;
+            margin: 0;
+            background: var(--canvas);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+
+        .shell {
+            display: grid;
+            min-height: 100vh;
+            grid-template-columns: minmax(0, 1.05fr) minmax(420px, .95fr);
+        }
+
+        .intro {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 48px 9%;
+            background: #172033;
+            color: #f7fafc;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .brand-mark,
+        .point-icon {
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            background: #167c80;
+        }
+
+        .brand-mark {
+            width: 36px;
+            height: 36px;
+        }
+
+        .brand-mark svg {
+            width: 19px;
+        }
+
+        .intro-copy {
+            max-width: 470px;
+            margin: 80px 0;
+        }
+
+        .eyebrow {
+            margin: 0 0 16px;
+            color: #8ed7d3;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 0 0 18px;
+            font-size: 42px;
+            line-height: 1.12;
+        }
+
+        .intro-copy p:last-child {
+            max-width: 390px;
+            margin: 0;
+            color: #b9c5d5;
+            font-size: 16px;
+            line-height: 1.65;
+        }
+
+        .points {
+            display: grid;
+            gap: 17px;
+        }
+
+        .point {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #cdd6e2;
+            font-size: 14px;
+        }
+
+        .point-icon {
+            width: 30px;
+            height: 30px;
+            background: #27344a;
+            color: #8ed7d3;
+        }
+
+        .point-icon svg {
+            width: 16px;
+        }
+
+        .form-side {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 36px;
+            background: #fff;
+        }
+
+        .form-card {
+            width: 100%;
+            max-width: 390px;
+        }
+
+        .heading {
+            margin-bottom: 26px;
+        }
+
+        .heading h2 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+
+        .heading p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .notice {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 10;
+            width: min(420px, calc(100vw - 32px));
+            margin: 0;
+            padding: 12px 14px;
+            border: 1px solid #f2c5c2;
+            border-radius: 6px;
+            background: #fff5f4;
+            box-shadow: 0 10px 28px rgba(23, 32, 51, .16);
+            color: var(--danger);
+            font-size: 14px;
+            line-height: 1.45;
+            transition: opacity .2s ease, transform .2s ease;
+        }
+
+        .notice.is-hiding { opacity: 0; transform: translateX(18px); }
+
+        .field {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .input-wrap {
+            position: relative;
+        }
+
+        .input-wrap svg {
+            position: absolute;
+            top: 50%;
+            left: 13px;
+            width: 18px;
+            color: #7b8798;
+            transform: translateY(-50%);
+        }
+
+        input {
+            width: 100%;
+            height: 46px;
+            padding: 0 13px 0 43px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            outline: 0;
+            color: var(--ink);
+            font: inherit;
+            font-size: 14px;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(22, 124, 128, .12);
+        }
+
+        .submit {
+            width: 100%;
+            height: 46px;
+            margin-top: 23px;
+            border: 0;
+            border-radius: 6px;
+            background: var(--accent);
+            color: #fff;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .submit:hover {
+            background: var(--accent-dark);
+        }
+
+        .footer {
+            margin: 24px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .footer a {
+            color: var(--accent);
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        @media (max-width:800px) {
+            .shell {
+                grid-template-columns: 1fr;
+            }
+
+            .intro {
+                display: none;
+            }
+
+            .form-side {
+                min-height: 100vh;
+            }
+        }
+
+        @media (max-width:440px) {
+            .form-side {
+                padding: 24px 20px;
+            }
+
+            .heading h2 {
+                font-size: 24px;
+            }
+        }
     </style>
 </head>
+
 <body>
     <main class="shell">
-        <section class="intro"><div class="brand"><span class="brand-mark"><i data-lucide="shopping-bag"></i></span>Quần Áo Shop</div><div class="intro-copy"><p class="eyebrow">Khu vực nội bộ</p><h1>Bắt đầu với tài khoản của bạn.</h1><p>Tạo tài khoản để sử dụng dashboard và các chức năng được cấp quyền.</p></div><div class="points"><div class="point"><span class="point-icon"><i data-lucide="user-plus"></i></span>Tạo tài khoản trong vài phút</div><div class="point"><span class="point-icon"><i data-lucide="shield-check"></i></span>Quyền truy cập được kiểm soát</div></div></section>
-        <section class="form-side"><div class="form-card"><div class="heading"><h2>Tạo tài khoản</h2><p>Điền thông tin bên dưới để bắt đầu.</p></div>@if($errors->any())<div class="notice">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif<form action="{{ route('register') }}" method="POST">@csrf<div class="field"><label for="name">Họ và tên</label><div class="input-wrap"><i data-lucide="user"></i><input id="name" type="text" name="name" value="{{ old('name') }}" autocomplete="name" required autofocus></div></div><div class="field"><label for="email">Email</label><div class="input-wrap"><i data-lucide="mail"></i><input id="email" type="email" name="email" value="{{ old('email') }}" autocomplete="email" required></div></div><div class="field"><label for="password">Mật khẩu</label><div class="input-wrap"><i data-lucide="lock-keyhole"></i><input id="password" type="password" name="password" autocomplete="new-password" required></div></div><div class="field"><label for="password_confirmation">Xác nhận mật khẩu</label><div class="input-wrap"><i data-lucide="shield-check"></i><input id="password_confirmation" type="password" name="password_confirmation" autocomplete="new-password" required></div></div><button class="submit" type="submit">Tạo tài khoản</button></form><p class="footer">Đã có tài khoản? <a href="{{ route('login') }}">Đăng nhập</a></p></div></section>
+        <section class="intro">
+            <div class="brand"><span class="brand-mark"><i data-lucide="shopping-bag"></i></span>Quần Áo Shop</div>
+            <div class="intro-copy">
+                <p class="eyebrow">Khu vực nội bộ</p>
+                <h1>Bắt đầu với tài khoản của bạn.</h1>
+                <p>Tạo tài khoản để sử dụng dashboard và các chức năng được cấp quyền.</p>
+            </div>
+            <div class="points">
+                <div class="point"><span class="point-icon"><i data-lucide="user-plus"></i></span>Tạo tài khoản trong
+                    vài phút</div>
+                <div class="point"><span class="point-icon"><i data-lucide="shield-check"></i></span>Quyền truy cập
+                    được kiểm soát</div>
+            </div>
+        </section>
+        <section class="form-side">
+            <div class="form-card">
+                <div class="heading">
+                    <h2>Tạo tài khoản</h2>
+                    <p>Điền thông tin bên dưới để bắt đầu.</p>
+                </div>
+                @if ($errors->any())
+                    <div class="notice">
+                        @foreach ($errors->all() as $error)
+                            <div>{{ $error }}</div>
+                        @endforeach
+                    </div>
+                @endif
+                <form action="{{ route('register') }}" method="POST">@csrf<div class="field"><label for="name">Họ
+                            và tên</label>
+                        <div class="input-wrap"><i data-lucide="user"></i><input id="name" type="text"
+                                name="name" value="{{ old('name') }}" autocomplete="name" required autofocus></div>
+                    </div>
+                    <div class="field"><label for="email">Email</label>
+                        <div class="input-wrap"><i data-lucide="mail"></i><input id="email" type="email"
+                                name="email" value="{{ old('email') }}" autocomplete="email" required></div>
+                    </div>
+                    <div class="field"><label for="password">Mật khẩu</label>
+                        <div class="input-wrap"><i data-lucide="lock-keyhole"></i><input id="password" type="password"
+                                name="password" autocomplete="new-password" required></div>
+                    </div>
+                    <div class="field"><label for="password_confirmation">Xác nhận mật khẩu</label>
+                        <div class="input-wrap"><i data-lucide="shield-check"></i><input id="password_confirmation"
+                                type="password" name="password_confirmation" autocomplete="new-password" required></div>
+                    </div><button class="submit" type="submit">Tạo tài khoản</button>
+                </form>
+                <p class="footer">Đã có tài khoản? <a href="{{ route('login') }}">Đăng nhập</a></p>
+            </div>
+        </section>
     </main>
-    <script>lucide.createIcons();</script>
+    <script>
+        lucide.createIcons();
+        document.querySelectorAll('.notice').forEach((notice) => window.setTimeout(() => {
+            notice.classList.add('is-hiding');
+            window.setTimeout(() => notice.remove(), 220);
+        }, 5000));
+    </script>
 </body>
+
 </html>

@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -22,7 +24,9 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'avatar_path',
         'password',
+        'must_change_password',
     ];
 
     /**
@@ -45,6 +49,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'must_change_password' => 'boolean',
         ];
     }
 
@@ -54,6 +59,16 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class);
+    }
+
+    public function teacherProfile(): HasOne
+    {
+        return $this->hasOne(Teacher::class);
+    }
+
+    public function studentProfile(): HasOne
+    {
+        return $this->hasOne(Student::class);
     }
 
     /**
@@ -76,5 +91,19 @@ class User extends Authenticatable
                 $query->where('slug', $permission);
             })
             ->exists();
+    }
+
+    /**
+     * Get the unique permission slugs granted by every assigned role.
+     */
+    public function permissionSlugs(): Collection
+    {
+        return $this->roles()
+            ->with('permissions:id,slug')
+            ->get()
+            ->flatMap(fn (Role $role) => $role->permissions->pluck('slug'))
+            ->filter()
+            ->unique()
+            ->values();
     }
 }
