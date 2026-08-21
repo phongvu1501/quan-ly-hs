@@ -107,6 +107,10 @@ class DynamicMenuController extends Controller
             403
         );
 
+        if ($menu->required_permission && ! $user->hasPermission($menu->required_permission)) {
+            abort(403, 'Bạn không có quyền truy cập chức năng này.');
+        }
+
         // Optional conventional permissions make CRUD stricter when they
         // exist; otherwise the role-menu assignment is the access grant.
         if ($action !== 'view') {

@@ -110,6 +110,7 @@
                                     <td>{{ $assignment->teacher?->full_name }}</td>
                                     <td>{{ $assignment->semester?->name ?: 'Cả năm' }}</td>
                                     <td class="text-end">
+                                        <a href="{{ route('admin.school.assignments.edit', $assignment) }}" class="btn btn-sm btn-light" title="Sửa phân công"><i data-lucide="pencil"></i><span class="visually-hidden">Sửa</span></a>
                                         <form action="{{ route('admin.school.assignments.destroy', $assignment) }}"
                                             method="POST" data-modal-title="Xóa phân công"
                                             data-confirm="Xóa phân công này?">@csrf @method('DELETE')<button

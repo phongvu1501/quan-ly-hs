@@ -35,7 +35,7 @@
                 <tbody>
                     @forelse($classes as $class)
                         <tr>
-                            <td><strong>{{ $class->name }}</strong><small
+                            <td><a href="{{ route('admin.school.classes.students', $class) }}" class="text-decoration-none"><strong>{{ $class->name }}</strong></a><small
                                     class="d-block text-secondary"><code>{{ $class->code }}</code></small></td>
                             <td>{{ $class->academicYear?->name }}</td>
                             <td>{{ $class->grade?->name }}</td>

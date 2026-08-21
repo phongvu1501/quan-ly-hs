@@ -7,7 +7,7 @@
             : request()->is('workspace/'.$menu->slug);
     @endphp
     @if ($children->isNotEmpty())
-        <details class="nav-group" @if ($active || $children->contains(fn ($child) => request()->is('workspace/'.$child->slug))) open @endif>
+        <details class="nav-group" data-sidebar-key="menu-{{ $menu->id }}" @if ($active || $children->contains(fn ($child) => request()->is('workspace/'.$child->slug))) open @endif>
             <summary class="nav-group-toggle">
                 <span class="nav-item-label"><i data-lucide="{{ $icon }}"></i><span>{{ $menu->name }}</span></span>
                 <i class="nav-chevron" data-lucide="chevron-right"></i>

@@ -400,6 +400,10 @@
                 </div>
             </div>
             <div>
+                <label for="schedule-week">Tuần bắt đầu</label>
+                <input id="schedule-week" type="date" name="week_start" class="form-control" value="{{ $selectedWeekStart?->format('Y-m-d') }}">
+            </div>
+            <div>
                 <label for="schedule-year">Năm học</label>
                 <select id="schedule-year" name="academic_year_id" class="form-select">
                     @foreach ($years as $academicYear)
@@ -533,6 +537,7 @@
                     <input type="hidden" name="_method" id="scheduleEditorMethod" value="PUT" disabled>
                     <input type="hidden" name="academic_year_id" id="scheduleEditorYear"
                         value="{{ $selectedYearId }}">
+                    <input type="hidden" name="week_start" id="scheduleEditorWeekStart" value="{{ $selectedWeekStart?->format('Y-m-d') }}">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6">

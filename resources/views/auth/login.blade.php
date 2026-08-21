@@ -336,7 +336,7 @@
                                 @checked(old('remember'))>Ghi nhớ đăng nhập</label><button class="submit"
                             type="submit">Đăng nhập</button>
                     </form>
-                    <p class="footer">Chưa có tài khoản? <a href="{{ route('register') }}">Tạo tài khoản</a></p>
+                    {{-- <p class="footer">Chưa có tài khoản? <a href="{{ route('register') }}">Tạo tài khoản</a></p> --}}
             </div>
         </section>
     </main>

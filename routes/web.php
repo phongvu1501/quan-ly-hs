@@ -16,10 +16,10 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
 
     // Register
-    Route::get('/register', [AuthController::class, 'showRegister'])
-        ->name('register');
+    // Route::get('/register', [AuthController::class, 'showRegister'])
+    //     ->name('register');
 
-    Route::post('/register', [AuthController::class, 'register']);
+    // Route::post('/register', [AuthController::class, 'register']);
 
     // Login
     Route::get('/login', [AuthController::class, 'showLogin'])
@@ -228,6 +228,7 @@ Route::middleware('auth')->prefix('admin/school')->name('admin.school.')->group(
     Route::get('/teachers/subject', [SchoolController::class, 'subjectTeachers'])->name('teachers.subject')->middleware('permission:teachers.manage');
     Route::get('/teachers/create', [SchoolController::class, 'createTeacher'])->name('teachers.create')->middleware('permission:teachers.create');
     Route::post('/teachers', [SchoolController::class, 'storeTeacher'])->name('teachers.store')->middleware('permission:teachers.create');
+
     Route::get('/teachers/{teacher}/edit', [SchoolController::class, 'editTeacher'])->name('teachers.edit')->middleware('permission:teachers.edit');
     Route::put('/teachers/{teacher}', [SchoolController::class, 'updateTeacher'])->name('teachers.update')->middleware('permission:teachers.edit');
     Route::get('/teachers/{teacher}/history', [SchoolController::class, 'teacherHistory'])->name('teachers.history')->middleware('permission:teachers.manage');
@@ -251,6 +252,7 @@ Route::middleware('auth')->prefix('admin/school')->name('admin.school.')->group(
     Route::get('/classes', [SchoolController::class, 'classes'])->name('classes.index')->middleware('permission:classes.manage');
     Route::get('/classes/create', [SchoolController::class, 'createClass'])->name('classes.create')->middleware('permission:classes.manage');
     Route::post('/classes', [SchoolController::class, 'storeClass'])->name('classes.store')->middleware('permission:classes.manage');
+    Route::get('/classes/{schoolClass}/students', [SchoolController::class, 'classStudents'])->name('classes.students')->middleware('permission:classes.manage');
     Route::get('/classes/{schoolClass}/edit', [SchoolController::class, 'editClass'])->name('classes.edit')->middleware('permission:classes.manage');
     Route::put('/classes/{schoolClass}', [SchoolController::class, 'updateClass'])->name('classes.update')->middleware('permission:classes.manage');
     Route::delete('/classes/{schoolClass}', [SchoolController::class, 'destroyClass'])->name('classes.destroy')->middleware('permission:classes.manage');

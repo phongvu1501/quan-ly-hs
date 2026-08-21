@@ -47,10 +47,14 @@ class Menu extends Model
     public function isVisibleTo(Collection $roleIds, Collection $permissionSlugs): bool
     {
         $roleVisible = $this->roles->pluck('id')->intersect($roleIds)->isNotEmpty();
-        $permissionVisible = $this->required_permission
-            && $permissionSlugs->contains($this->required_permission);
 
-        return $roleVisible || $permissionVisible;
+        // A menu assignment never bypasses the permission explicitly required
+        // by that path. This keeps the sidebar and direct URL access consistent.
+        if ($this->required_permission) {
+            return $permissionSlugs->contains($this->required_permission);
+        }
+
+        return $roleVisible;
     }
 
     public function url(): string
