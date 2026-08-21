@@ -6,11 +6,12 @@ use App\Models\AcademicYear;
 use App\Models\Announcement;
 use App\Models\AttendanceRecord;
 use App\Models\Exam;
-use App\Models\Score;
 use App\Models\Schedule;
+use App\Models\Score;
 use App\Models\Semester;
 use App\Models\Student;
 use App\Models\TeacherComment;
+use App\Notifications\ExamInvigilationAssigned;
 use Illuminate\Http\Request;
 
 class TeacherPortalController extends Controller
@@ -40,6 +41,7 @@ class TeacherPortalController extends Controller
         )->unique()->values();
         $announcements = $this->teacherAnnouncements($classIds);
         $upcomingExams = $this->teacherExams($year, $semester, $classIds, $assignments);
+        $invigilationNotifications = $this->teacherInvigilationNotifications();
 
         return view('teacher.dashboard', [
             'teacher' => $teacher,
@@ -51,6 +53,7 @@ class TeacherPortalController extends Controller
             'schedule' => $schedule,
             'announcements' => $announcements,
             'upcomingExams' => $upcomingExams,
+            'invigilationNotifications' => $invigilationNotifications,
         ]);
     }
 
@@ -73,6 +76,7 @@ class TeacherPortalController extends Controller
             ->get();
         $announcements = $this->teacherAnnouncements($classIds);
         $upcomingExams = $this->teacherExams($year, $semester, $classIds);
+        $invigilationNotifications = $this->teacherInvigilationNotifications();
         $todayAttendance = AttendanceRecord::whereIn('class_id', $classIds)
             ->whereDate('attended_on', today())
             ->whereNull('subject_id')
@@ -88,6 +92,7 @@ class TeacherPortalController extends Controller
             'schedule' => $schedule,
             'announcements' => $announcements,
             'upcomingExams' => $upcomingExams,
+            'invigilationNotifications' => $invigilationNotifications,
             'todayAttendance' => $todayAttendance,
         ]);
     }
@@ -113,9 +118,10 @@ class TeacherPortalController extends Controller
         $classIds = $assignments->pluck('class_id')->unique()->values();
         $announcements = $this->teacherAnnouncements($classIds);
         $upcomingExams = $this->teacherExams($year, $semester, $classIds, $assignments);
+        $invigilationNotifications = $this->teacherInvigilationNotifications();
         $studentCount = $assignments->pluck('class')->filter()->flatMap(fn ($class) => $class->enrollments)->unique('student_id')->count();
 
-        return view('teacher.subject', compact('teacher', 'year', 'semester', 'assignments', 'schedule', 'announcements', 'upcomingExams', 'studentCount'));
+        return view('teacher.subject', compact('teacher', 'year', 'semester', 'assignments', 'schedule', 'announcements', 'upcomingExams', 'studentCount', 'invigilationNotifications'));
     }
 
     public function scores(Request $request)
@@ -216,7 +222,7 @@ class TeacherPortalController extends Controller
         $saved = 0;
         foreach ($data['scores'] as $rowKey => $row) {
             $studentId = (int) explode('_', (string) $rowKey, 2)[0];
-            if (!array_key_exists('score', $row) || $row['score'] === null || $row['score'] === '') {
+            if (! array_key_exists('score', $row) || $row['score'] === null || $row['score'] === '') {
                 continue;
             }
             abort_unless($studentIds->contains($studentId), 422, 'Học sinh không thuộc lớp được phân công.');
@@ -233,7 +239,7 @@ class TeacherPortalController extends Controller
                 'note' => $row['note'] ?? null,
                 'entered_by' => auth()->id(),
             ];
-            $existing = !empty($row['score_id'])
+            $existing = ! empty($row['score_id'])
                 ? Score::whereKey($row['score_id'])
                     ->where('assignment_id', $assignment->id)
                     ->where('student_id', $studentId)
@@ -370,13 +376,13 @@ class TeacherPortalController extends Controller
         $classAssignments = $assignments->where('class_id', $classId)->values();
         $subjects = $classAssignments->pluck('subject')->filter()->unique('id')->sortBy('name')->values();
         $subjectId = $request->filled('subject_id') ? (int) $request->input('subject_id') : null;
-        if ($subjectId && !$subjects->contains('id', $subjectId)) {
+        if ($subjectId && ! $subjects->contains('id', $subjectId)) {
             $subjectId = null;
         }
 
         $semesterId = $request->filled('semester_id') ? (int) $request->input('semester_id') : $semester?->id;
         $semesterOptions = $year?->semesters()->orderBy('number')->get() ?? collect();
-        if ($semesterId && !$semesterOptions->contains('id', $semesterId)) {
+        if ($semesterId && ! $semesterOptions->contains('id', $semesterId)) {
             $semesterId = $semester?->id;
         }
         $selectedSemester = $semesterOptions->firstWhere('id', $semesterId) ?: $semester;
@@ -487,7 +493,9 @@ class TeacherPortalController extends Controller
         foreach ($data['comments'] as $studentId => $row) {
             $studentId = (int) $studentId;
             $content = trim((string) ($row['content'] ?? ''));
-            if ($content === '') continue;
+            if ($content === '') {
+                continue;
+            }
             abort_unless($studentIds->contains($studentId), 422, 'Học sinh không thuộc lớp được phân công.');
 
             $isHomeroomTeacher = $teacher->homeroomClasses()
@@ -505,7 +513,7 @@ class TeacherPortalController extends Controller
                 ->exists();
             abort_unless($isHomeroomTeacher || $hasTeachingAssignment, 403, 'Bạn không được phân công cho học sinh này.');
 
-            $existing = !empty($row['comment_id'])
+            $existing = ! empty($row['comment_id'])
                 ? TeacherComment::whereKey($row['comment_id'])
                     ->where('teacher_id', $teacher->id)
                     ->where('student_id', $studentId)
@@ -595,10 +603,19 @@ class TeacherPortalController extends Controller
 
     private function academicRating(?float $average): string
     {
-        if ($average === null) return 'Chưa đủ dữ liệu';
-        if ($average >= 8) return 'Giỏi';
-        if ($average >= 6.5) return 'Khá';
-        if ($average >= 5) return 'Trung bình';
+        if ($average === null) {
+            return 'Chưa đủ dữ liệu';
+        }
+        if ($average >= 8) {
+            return 'Giỏi';
+        }
+        if ($average >= 6.5) {
+            return 'Khá';
+        }
+        if ($average >= 5) {
+            return 'Trung bình';
+        }
+
         return 'Yếu';
     }
 
@@ -630,6 +647,15 @@ class TeacherPortalController extends Controller
                 $query->whereNull('expires_at')->orWhere('expires_at', '>=', now());
             })
             ->latest('published_at')
+            ->limit(8)
+            ->get();
+    }
+
+    private function teacherInvigilationNotifications()
+    {
+        return auth()->user()->notifications()
+            ->where('type', ExamInvigilationAssigned::class)
+            ->latest()
             ->limit(8)
             ->get();
     }

@@ -127,6 +127,7 @@
                     <h2 class="panel-title mb-0">Thông báo dành cho giáo viên</h2>
                 </div>
                 <div class="list-group list-group-flush">
+                    @include('teacher.partials.invigilation-notifications')
                     @forelse($announcements as $announcement)
                         <div class="list-group-item px-4 py-3">
                             <div class="d-flex justify-content-between gap-3">
