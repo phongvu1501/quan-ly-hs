@@ -56,20 +56,20 @@ class SchoolController extends Controller
         $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
         $classId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
         $status = trim((string) $request->input('status', ''));
-        $students = Student::with(['enrollments' => fn ($query) => $query
+        $students = Student::with(['enrollments' => fn($query) => $query
             ->with('class.grade', 'academicYear')
             ->where('status', 'active')
             ->latest('id')])
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('student_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%");
             }))
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->when($yearId || $classId, fn ($query) => $query->whereHas('enrollments', function ($enrollment) use ($yearId, $classId): void {
-                $enrollment->when($yearId, fn ($q) => $q->where('academic_year_id', $yearId))
-                    ->when($classId, fn ($q) => $q->where('class_id', $classId));
+            ->when($status !== '', fn($query) => $query->where('status', $status))
+            ->when($yearId || $classId, fn($query) => $query->whereHas('enrollments', function ($enrollment) use ($yearId, $classId): void {
+                $enrollment->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))
+                    ->when($classId, fn($q) => $q->where('class_id', $classId));
             }))
             ->orderBy('full_name')
             ->paginate(15)
@@ -111,7 +111,7 @@ class SchoolController extends Controller
 
     public function editStudent(Student $student)
     {
-        $student->load(['enrollments' => fn ($query) => $query->where('status', 'active')->latest('academic_year_id')]);
+        $student->load(['enrollments' => fn($query) => $query->where('status', 'active')->latest('academic_year_id')]);
 
         return view('admin.school.students.form', [
             'student' => $student,
@@ -158,8 +158,8 @@ class SchoolController extends Controller
         $classId = $student->enrollments()->where('academic_year_id', $year?->id)->value('class_id');
         $notices = FeeNotice::where('academic_year_id', $year?->id)
             ->where('is_active', true)
-            ->where(fn ($query) => $query->whereNull('class_id')->orWhere('class_id', $classId))
-            ->with(['payments' => fn ($query) => $query->where('student_id', $student->id)])
+            ->where(fn($query) => $query->whereNull('class_id')->orWhere('class_id', $classId))
+            ->with(['payments' => fn($query) => $query->where('student_id', $student->id)])
             ->latest()
             ->get();
 
@@ -231,8 +231,14 @@ class SchoolController extends Controller
         $years = AcademicYear::whereIn('id', $yearIds)->orderByDesc('starts_on')->get();
 
         return view('admin.school.students.transcript', compact(
-            'student', 'years', 'enrollments', 'scores', 'subjectResults',
-            'conductEvaluations', 'examResults', 'attendanceSummary'
+            'student',
+            'years',
+            'enrollments',
+            'scores',
+            'subjectResults',
+            'conductEvaluations',
+            'examResults',
+            'attendanceSummary'
         ));
     }
 
@@ -242,15 +248,15 @@ class SchoolController extends Controller
         $status = trim((string) $request->input('status', ''));
         $type = trim((string) $request->input('type', ''));
         $teachers = Teacher::withCount(['homeroomClasses', 'assignments'])
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('teacher_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('specialization', 'like', "%{$search}%");
             }))
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
-            ->when($type === 'homeroom', fn ($query) => $query->whereHas('homeroomClasses'))
-            ->when($type === 'subject', fn ($query) => $query->whereHas('assignments'))
+            ->when($status !== '', fn($query) => $query->where('status', $status))
+            ->when($type === 'homeroom', fn($query) => $query->whereHas('homeroomClasses'))
+            ->when($type === 'subject', fn($query) => $query->whereHas('assignments'))
             ->orderBy('full_name')
             ->paginate(15)
             ->withQueryString();
@@ -276,15 +282,15 @@ class SchoolController extends Controller
     {
         $search = trim((string) $request->input('q', ''));
         $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
-        $teachers = Teacher::with(['homeroomClasses' => fn ($query) => $query
+        $teachers = Teacher::with(['homeroomClasses' => fn($query) => $query
             ->with(['academicYear', 'grade'])
-            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))])
-            ->whereHas('homeroomClasses', fn ($query) => $query
-                ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId)))
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))])
+            ->whereHas('homeroomClasses', fn($query) => $query
+                ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId)))
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('teacher_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
-                    ->orWhereHas('homeroomClasses', fn ($class) => $class
+                    ->orWhereHas('homeroomClasses', fn($class) => $class
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%"));
             }))
@@ -302,15 +308,15 @@ class SchoolController extends Controller
     {
         $search = trim((string) $request->input('q', ''));
         $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
-        $teachers = Teacher::with(['assignments' => fn ($query) => $query
+        $teachers = Teacher::with(['assignments' => fn($query) => $query
             ->with(['academicYear', 'semester', 'class.grade', 'subject'])
-            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))])
-            ->whereHas('assignments', fn ($query) => $query
-                ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId)))
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))])
+            ->whereHas('assignments', fn($query) => $query
+                ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId)))
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('teacher_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
-                    ->orWhereHas('assignments.subject', fn ($subject) => $subject
+                    ->orWhereHas('assignments.subject', fn($subject) => $subject
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%"));
             }))
@@ -372,9 +378,9 @@ class SchoolController extends Controller
             ->with(['exam.academicYear', 'exam.semester', 'exam.subject', 'exam.class'])
             ->whereHas('exam')
             ->get()
-            ->sortByDesc(fn ($assignment) => $assignment->exam?->exam_date?->format('Y-m-d').' '.($assignment->exam?->starts_at ?? ''))
+            ->sortByDesc(fn($assignment) => $assignment->exam?->exam_date?->format('Y-m-d') . ' ' . ($assignment->exam?->starts_at ?? ''))
             ->values();
-        $subjectYears = $teacher->subjects->groupBy(fn ($subject) => $subject->pivot->academic_year_id);
+        $subjectYears = $teacher->subjects->groupBy(fn($subject) => $subject->pivot->academic_year_id);
         $yearIds = collect()
             ->merge($assignments->pluck('academic_year_id'))
             ->merge($homeroomClasses->pluck('academic_year_id'))
@@ -387,7 +393,13 @@ class SchoolController extends Controller
         $years = AcademicYear::whereIn('id', $yearIds)->orderByDesc('starts_on')->get();
 
         return view('admin.school.teachers.history', compact(
-            'teacher', 'years', 'assignments', 'homeroomClasses', 'schedules', 'subjectYears', 'examInvigilations'
+            'teacher',
+            'years',
+            'assignments',
+            'homeroomClasses',
+            'schedules',
+            'subjectYears',
+            'examInvigilations'
         ));
     }
 
@@ -421,12 +433,12 @@ class SchoolController extends Controller
         $search = trim((string) $request->input('q', ''));
         $level = $request->filled('level') ? (int) $request->input('level') : null;
         $grades = Grade::withCount('classes')
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('level', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
             }))
-            ->when($level, fn ($query) => $query->where('level', $level))
+            ->when($level, fn($query) => $query->where('level', $level))
             ->orderBy('level')
             ->paginate(15)
             ->withQueryString();
@@ -485,12 +497,12 @@ class SchoolController extends Controller
         $active = $request->input('active', '');
         $subjects = Subject::withCount(['assignments'])
             ->with(['assignments.teacher'])
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
                     ->orWhere('short_name', 'like', "%{$search}%");
             }))
-            ->when($active !== '', fn ($query) => $query->where('is_active', $active === 'active'))
+            ->when($active !== '', fn($query) => $query->where('is_active', $active === 'active'))
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
@@ -556,16 +568,16 @@ class SchoolController extends Controller
         $gradeId = $request->filled('grade_id') ? (int) $request->input('grade_id') : null;
         $status = trim((string) $request->input('status', ''));
         $classes = SchoolClass::with(['academicYear', 'grade', 'homeroomTeacher'])
-            ->withCount(['enrollments' => fn ($query) => $query->where('status', 'active')])
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->withCount(['enrollments' => fn($query) => $query->where('status', 'active')])
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhereHas('grade', fn ($grade) => $grade->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('homeroomTeacher', fn ($teacher) => $teacher->where('full_name', 'like', "%{$search}%"));
+                    ->orWhereHas('grade', fn($grade) => $grade->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('homeroomTeacher', fn($teacher) => $teacher->where('full_name', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
-            ->when($gradeId, fn ($query) => $query->where('grade_id', $gradeId))
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+            ->when($gradeId, fn($query) => $query->where('grade_id', $gradeId))
+            ->when($status !== '', fn($query) => $query->where('status', $status))
             ->orderByDesc('academic_year_id')
             ->orderBy('name')
             ->paginate(15)
@@ -596,7 +608,7 @@ class SchoolController extends Controller
         $enrollments = $schoolClass->enrollments()
             ->with('student')
             ->where('status', 'active')
-            ->when($search !== '', fn ($query) => $query->whereHas('student', function ($student) use ($search): void {
+            ->when($search !== '', fn($query) => $query->whereHas('student', function ($student) use ($search): void {
                 $student->where('student_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
@@ -647,7 +659,7 @@ class SchoolController extends Controller
             'grades' => Grade::orderBy('level')->get(),
             'teachers' => Teacher::where(function ($query) use ($schoolClass): void {
                 $query->where('status', 'active')
-                    ->when($schoolClass->homeroom_teacher_id, fn ($query) => $query->orWhere('id', $schoolClass->homeroom_teacher_id));
+                    ->when($schoolClass->homeroom_teacher_id, fn($query) => $query->orWhere('id', $schoolClass->homeroom_teacher_id));
             })->orderBy('full_name')->get(),
         ]);
     }
@@ -702,16 +714,16 @@ class SchoolController extends Controller
         $subjectId = $request->filled('subject_id') ? (int) $request->input('subject_id') : null;
         $teacherId = $request->filled('teacher_id') ? (int) $request->input('teacher_id') : null;
         $assignments = TeachingAssignment::with(['academicYear', 'semester', 'class', 'subject', 'teacher'])
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                    ->orWhereHas('teacher', fn ($teacher) => $teacher->where('full_name', 'like', "%{$search}%"));
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+                $query->whereHas('class', fn($class) => $class->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('subject', fn($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('teacher', fn($teacher) => $teacher->where('full_name', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
-            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
-            ->when($classId, fn ($query) => $query->where('class_id', $classId))
-            ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
-            ->when($teacherId, fn ($query) => $query->where('teacher_id', $teacherId))
+            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+            ->when($semesterId, fn($query) => $query->where('semester_id', $semesterId))
+            ->when($classId, fn($query) => $query->where('class_id', $classId))
+            ->when($subjectId, fn($query) => $query->where('subject_id', $subjectId))
+            ->when($teacherId, fn($query) => $query->where('teacher_id', $teacherId))
             ->latest()
             ->paginate(20)
             ->withQueryString();
@@ -836,7 +848,11 @@ class SchoolController extends Controller
             ->get();
 
         return view('admin.school.subjects.teacher-detail', compact(
-            'subject', 'teacher', 'assignments', 'homeroomClasses', 'classes'
+            'subject',
+            'teacher',
+            'assignments',
+            'homeroomClasses',
+            'classes'
         ));
     }
 
@@ -847,69 +863,179 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa phân công giảng dạy.');
     }
 
+    // public function scores(Request $request)
+    // {
+    //     $search = trim((string) $request->input('q', ''));
+    //     $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
+    //     $semesterId = $request->filled('semester_id') ? (int) $request->input('semester_id') : null;
+    //     $classId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
+    //     $gradeId = $request->filled('grade_id') ? (int) $request->input('grade_id') : null;
+    //     $subjectId = $request->filled('subject_id') ? (int) $request->input('subject_id') : null;
+    //     $scoreType = trim((string) $request->input('score_type', ''));
+    //     $dateFrom = $request->date('date_from');
+    //     $dateTo = $request->date('date_to');
+    //     $scoreRows = Score::with(['student', 'class', 'subject', 'semester', 'academicYear'])
+    //         ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+    //             $query->whereHas('student', fn ($student) => $student->where('full_name', 'like', "%{$search}%")->orWhere('student_code', 'like', "%{$search}%"))
+    //                 ->orWhereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%"))
+    //                 ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
+    //         }))
+    //         ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+    //         ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+    //         ->when($classId, fn ($query) => $query->where('class_id', $classId))
+    //         ->when($gradeId, fn ($query) => $query->whereHas('class', fn ($class) => $class->where('grade_id', $gradeId)))
+    //         ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
+    //         ->when($scoreType !== '', fn ($query) => $query->where('score_type', $scoreType))
+    //         ->when($dateFrom, fn ($query) => $query->whereDate('assessed_on', '>=', $dateFrom))
+    //         ->when($dateTo, fn ($query) => $query->whereDate('assessed_on', '<=', $dateTo))
+    //         ->latest('assessed_on')->latest()->get();
+
+    //     $scoreGroups = $scoreRows->groupBy(fn ($score) => implode('|', [
+    //         $score->academic_year_id,
+    //         $score->semester_id,
+    //         $score->student_id,
+    //         $score->class_id,
+    //         $score->subject_id,
+    //     ]))->map(function ($group): object {
+    //         $first = $group->first();
+
+    //         return (object) [
+    //             'scores' => $group->sortByDesc(fn ($score) => $score->assessed_on?->timestamp ?: 0)->values(),
+    //             'student' => $first->student,
+    //             'class' => $first->class,
+    //             'subject' => $first->subject,
+    //             'semester' => $first->semester,
+    //             'academicYear' => $first->academicYear,
+    //             'latestTimestamp' => $group->max(fn ($score) => $score->assessed_on?->timestamp ?: 0),
+    //         ];
+    //     })->sortByDesc('latestTimestamp')->values();
+    //     $page = max(1, (int) $request->input('page', 1));
+    //     $scores = new LengthAwarePaginator(
+    //         $scoreGroups->forPage($page, 20)->values(),
+    //         $scoreGroups->count(),
+    //         20,
+    //         $page,
+    //         ['path' => $request->url(), 'query' => $request->query()]
+    //     );
+
+    //     return view('admin.school.scores.index', [
+    //         'scores' => $scores,
+    //         'years' => AcademicYear::orderByDesc('starts_on')->get(),
+    //         'semesters' => Semester::with('academicYear')->orderByDesc('id')->get(),
+    //         'classes' => SchoolClass::with('academicYear')->where('status', 'active')->orderByDesc('academic_year_id')->orderBy('name')->get(),
+    //         'grades' => Grade::orderBy('level')->get(),
+    //         'subjects' => Subject::where('is_active', true)->orderBy('name')->get(),
+    //         'scoreTypes' => ['oral' => 'Miệng', 'fifteen_minute' => '15 phút', 'one_period' => '1 tiết', 'midterm' => 'Giữa kỳ', 'final' => 'Cuối kỳ'],
+    //     ]);
+    // }
+
     public function scores(Request $request)
     {
-        $search = trim((string) $request->input('q', ''));
-        $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
-        $semesterId = $request->filled('semester_id') ? (int) $request->input('semester_id') : null;
-        $classId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
-        $gradeId = $request->filled('grade_id') ? (int) $request->input('grade_id') : null;
-        $subjectId = $request->filled('subject_id') ? (int) $request->input('subject_id') : null;
-        $scoreType = trim((string) $request->input('score_type', ''));
-        $dateFrom = $request->date('date_from');
-        $dateTo = $request->date('date_to');
-        $scoreRows = Score::with(['student', 'class', 'subject', 'semester', 'academicYear'])
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('student', fn ($student) => $student->where('full_name', 'like', "%{$search}%")->orWhere('student_code', 'like', "%{$search}%"))
-                    ->orWhereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
-            }))
-            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
-            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
-            ->when($classId, fn ($query) => $query->where('class_id', $classId))
-            ->when($gradeId, fn ($query) => $query->whereHas('class', fn ($class) => $class->where('grade_id', $gradeId)))
-            ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
-            ->when($scoreType !== '', fn ($query) => $query->where('score_type', $scoreType))
-            ->when($dateFrom, fn ($query) => $query->whereDate('assessed_on', '>=', $dateFrom))
-            ->when($dateTo, fn ($query) => $query->whereDate('assessed_on', '<=', $dateTo))
-            ->latest('assessed_on')->latest()->get();
+        $filters = [
+            'search'      => trim($request->input('q', '')),
+            'year_id'     => $request->integer('academic_year_id'),
+            'semester_id' => $request->integer('semester_id'),
+            'class_id'    => $request->integer('class_id'),
+            'grade_id'    => $request->integer('grade_id'),
+            'subject_id'  => $request->integer('subject_id'),
+            'score_type'  => trim($request->input('score_type', '')),
+            'date_from'   => $request->date('date_from'),
+            'date_to'     => $request->date('date_to'),
+        ];
 
-        $scoreGroups = $scoreRows->groupBy(fn ($score) => implode('|', [
-            $score->academic_year_id,
-            $score->semester_id,
-            $score->student_id,
-            $score->class_id,
-            $score->subject_id,
-        ]))->map(function ($group): object {
-            $first = $group->first();
+        $scoreRows = Score::with([
+            'student',
+            'class',
+            'subject',
+            'semester',
+            'academicYear',
+        ])
+            ->when($filters['search'], function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas(
+                        'student',
+                        fn($q) =>
+                        $q->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('student_code', 'like', "%{$search}%")
+                    )
+                        ->orWhereHas(
+                            'class',
+                            fn($q) =>
+                            $q->where('name', 'like', "%{$search}%")
+                        )
+                        ->orWhereHas(
+                            'subject',
+                            fn($q) =>
+                            $q->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%")
+                        );
+                });
+            })
+            ->when($filters['year_id'], fn($q, $id) => $q->where('academic_year_id', $id))
+            ->when($filters['semester_id'], fn($q, $id) => $q->where('semester_id', $id))
+            ->when($filters['class_id'], fn($q, $id) => $q->where('class_id', $id))
+            ->when(
+                $filters['grade_id'],
+                fn($q, $id) =>
+                $q->whereHas('class', fn($q) => $q->where('grade_id', $filters['grade_id']))
+            )
+            ->when($filters['subject_id'], fn($q, $id) => $q->where('subject_id', $id))
+            ->when($filters['score_type'], fn($q, $type) => $q->where('score_type', $type))
+            ->when($filters['date_from'], fn($q, $date) => $q->whereDate('assessed_on', '>=', $date))
+            ->when($filters['date_to'], fn($q, $date) => $q->whereDate('assessed_on', '<=', $date))
+            ->latest('assessed_on')
+            ->get();
 
-            return (object) [
-                'scores' => $group->sortByDesc(fn ($score) => $score->assessed_on?->timestamp ?: 0)->values(),
-                'student' => $first->student,
-                'class' => $first->class,
-                'subject' => $first->subject,
-                'semester' => $first->semester,
-                'academicYear' => $first->academicYear,
-                'latestTimestamp' => $group->max(fn ($score) => $score->assessed_on?->timestamp ?: 0),
-            ];
-        })->sortByDesc('latestTimestamp')->values();
-        $page = max(1, (int) $request->input('page', 1));
+        $scoreGroups = $scoreRows
+            ->groupBy(fn($score) => "{$score->academic_year_id}|{$score->semester_id}|{$score->student_id}|{$score->class_id}|{$score->subject_id}")
+            ->map(function ($group) {
+                $first = $group->first();
+
+                return (object) [
+                    'scores'          => $group->sortByDesc('assessed_on')->values(),
+                    'student'         => $first->student,
+                    'class'           => $first->class,
+                    'subject'         => $first->subject,
+                    'semester'        => $first->semester,
+                    'academicYear'    => $first->academicYear,
+                    'latestTimestamp' => $group->max(fn($score) => $score->assessed_on?->timestamp ?? 0),
+                ];
+            })
+            ->sortByDesc('latestTimestamp')
+            ->values();
+
+        $perPage = 20;
+        $page = $request->integer('page', 1);
+
         $scores = new LengthAwarePaginator(
-            $scoreGroups->forPage($page, 20)->values(),
+            $scoreGroups->forPage($page, $perPage)->values(),
             $scoreGroups->count(),
-            20,
+            $perPage,
             $page,
-            ['path' => $request->url(), 'query' => $request->query()]
+            [
+                'path'  => $request->url(),
+                'query' => $request->query(),
+            ]
         );
 
         return view('admin.school.scores.index', [
-            'scores' => $scores,
-            'years' => AcademicYear::orderByDesc('starts_on')->get(),
-            'semesters' => Semester::with('academicYear')->orderByDesc('id')->get(),
-            'classes' => SchoolClass::with('academicYear')->where('status', 'active')->orderByDesc('academic_year_id')->orderBy('name')->get(),
-            'grades' => Grade::orderBy('level')->get(),
-            'subjects' => Subject::where('is_active', true)->orderBy('name')->get(),
-            'scoreTypes' => ['oral' => 'Miệng', 'fifteen_minute' => '15 phút', 'one_period' => '1 tiết', 'midterm' => 'Giữa kỳ', 'final' => 'Cuối kỳ'],
+            'scores'     => $scores,
+            'years'      => AcademicYear::orderByDesc('starts_on')->get(),
+            'semesters'  => Semester::with('academicYear')->orderByDesc('id')->get(),
+            'classes'    => SchoolClass::with('academicYear')
+                ->where('status', 'active')
+                ->orderByDesc('academic_year_id')
+                ->orderBy('name')
+                ->get(),
+            'grades'     => Grade::orderBy('level')->get(),
+            'subjects'   => Subject::where('is_active', true)->orderBy('name')->get(),
+            'scoreTypes' => [
+                'oral'         => 'Miệng',
+                'fifteen_minute' => '15 phút',
+                'one_period'   => '1 tiết',
+                'midterm'      => 'Giữa kỳ',
+                'final'        => 'Cuối kỳ',
+            ],
         ]);
     }
 
@@ -927,16 +1053,16 @@ class SchoolController extends Controller
         $records = AttendanceRecord::with(['student', 'class', 'subject'])
             ->whereDate('attended_on', '>=', $dateFrom)
             ->whereDate('attended_on', '<=', $dateTo)
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('student', fn ($student) => $student->where('full_name', 'like', "%{$search}%")->orWhere('student_code', 'like', "%{$search}%"))
-                    ->orWhereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%"));
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+                $query->whereHas('student', fn($student) => $student->where('full_name', 'like', "%{$search}%")->orWhere('student_code', 'like', "%{$search}%"))
+                    ->orWhereHas('class', fn($class) => $class->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('subject', fn($subject) => $subject->where('name', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
-            ->when($classId, fn ($query) => $query->where('class_id', $classId))
-            ->when($gradeId, fn ($query) => $query->whereHas('class', fn ($class) => $class->where('grade_id', $gradeId)))
-            ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
-            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+            ->when($classId, fn($query) => $query->where('class_id', $classId))
+            ->when($gradeId, fn($query) => $query->whereHas('class', fn($class) => $class->where('grade_id', $gradeId)))
+            ->when($subjectId, fn($query) => $query->where('subject_id', $subjectId))
+            ->when($status !== '', fn($query) => $query->where('status', $status))
             ->latest()->paginate(30)->withQueryString();
 
         return view('admin.school.attendance.index', [
@@ -976,10 +1102,9 @@ class SchoolController extends Controller
 
         $classQuery = SchoolClass::with('grade')
             ->where('status', 'active')
-            ->when($selectedYearId, fn ($query) => $query->where('academic_year_id', $selectedYearId))
-            ->when($selectedClassId, fn ($query) => $query->whereKey($selectedClassId))
-            ->orderBy('name')
-            ;
+            ->when($selectedYearId, fn($query) => $query->where('academic_year_id', $selectedYearId))
+            ->when($selectedClassId, fn($query) => $query->whereKey($selectedClassId))
+            ->orderBy('name');
         // The schedule view renders one grid per class and needs collection
         // operations such as groupBy/whereIn; keep its options as a collection.
         $classOptions = (clone $classQuery)->get();
@@ -988,14 +1113,14 @@ class SchoolController extends Controller
         $teachers = Teacher::with('subjects')->where('status', 'active')->orderBy('full_name')->get();
 
         $schedules = Schedule::with(['class.grade', 'subject', 'teacher', 'semester'])
-            ->when($selectedYearId, fn ($query) => $query->where('academic_year_id', $selectedYearId))
-            ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
+            ->when($selectedYearId, fn($query) => $query->where('academic_year_id', $selectedYearId))
+            ->when($selectedSemesterId, fn($query) => $query->where('semester_id', $selectedSemesterId))
             ->whereDate('week_start', $selectedWeekStart)
-            ->when($selectedClassId, fn ($query) => $query->where('class_id', $selectedClassId))
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                    ->orWhereHas('teacher', fn ($teacher) => $teacher->where('full_name', 'like', "%{$search}%"))
+            ->when($selectedClassId, fn($query) => $query->where('class_id', $selectedClassId))
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+                $query->whereHas('class', fn($class) => $class->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('subject', fn($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('teacher', fn($teacher) => $teacher->where('full_name', 'like', "%{$search}%"))
                     ->orWhere('room', 'like', "%{$search}%");
             }))
             ->orderBy('class_id')
@@ -1004,10 +1129,18 @@ class SchoolController extends Controller
             ->get();
 
         return view('admin.school.schedules.index', compact(
-            'schedules', 'years', 'year', 'semesters', 'classes',
-            'classOptions', 'selectedWeekStart',
-            'selectedYearId', 'selectedSemesterId', 'selectedClassId',
-            'subjects', 'teachers'
+            'schedules',
+            'years',
+            'year',
+            'semesters',
+            'classes',
+            'classOptions',
+            'selectedWeekStart',
+            'selectedYearId',
+            'selectedSemesterId',
+            'selectedClassId',
+            'subjects',
+            'teachers'
         ));
     }
 
@@ -1055,20 +1188,20 @@ class SchoolController extends Controller
         $dateFrom = $request->date('date_from');
         $dateTo = $request->date('date_to');
         $exams = Exam::with(['subject', 'class', 'semester', 'invigilations.teacher'])
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('exam_type', 'like', "%{$search}%")
                     ->orWhere('room', 'like', "%{$search}%")
-                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('subject', fn($subject) => $subject->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('class', fn($class) => $class->where('name', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
-            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
-            ->when($classId, fn ($query) => $query->where('class_id', $classId))
-            ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
-            ->when($examType !== '', fn ($query) => $query->where('exam_type', $examType))
-            ->when($dateFrom, fn ($query) => $query->whereDate('exam_date', '>=', $dateFrom))
-            ->when($dateTo, fn ($query) => $query->whereDate('exam_date', '<=', $dateTo))
+            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+            ->when($semesterId, fn($query) => $query->where('semester_id', $semesterId))
+            ->when($classId, fn($query) => $query->where('class_id', $classId))
+            ->when($subjectId, fn($query) => $query->where('subject_id', $subjectId))
+            ->when($examType !== '', fn($query) => $query->where('exam_type', $examType))
+            ->when($dateFrom, fn($query) => $query->whereDate('exam_date', '>=', $dateFrom))
+            ->when($dateTo, fn($query) => $query->whereDate('exam_date', '<=', $dateTo))
             ->orderBy('exam_date')->paginate(20)->withQueryString();
 
         return view('admin.school.exams.index', [
@@ -1121,18 +1254,18 @@ class SchoolController extends Controller
         $dateTo = $request->date('date_to');
 
         $invigilations = ExamInvigilation::with(['exam.academicYear', 'exam.semester', 'exam.subject', 'exam.class', 'teacher'])
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('teacher', fn ($teacher) => $teacher
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+                $query->whereHas('teacher', fn($teacher) => $teacher
                     ->where('full_name', 'like', "%{$search}%")
                     ->orWhere('teacher_code', 'like', "%{$search}%"))
-                    ->orWhereHas('exam', fn ($exam) => $exam
+                    ->orWhereHas('exam', fn($exam) => $exam
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('room', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn ($query) => $query->whereHas('exam', fn ($exam) => $exam->where('academic_year_id', $yearId)))
-            ->when($teacherId, fn ($query) => $query->where('teacher_id', $teacherId))
-            ->when($dateFrom, fn ($query) => $query->whereHas('exam', fn ($exam) => $exam->whereDate('exam_date', '>=', $dateFrom)))
-            ->when($dateTo, fn ($query) => $query->whereHas('exam', fn ($exam) => $exam->whereDate('exam_date', '<=', $dateTo)))
+            ->when($yearId, fn($query) => $query->whereHas('exam', fn($exam) => $exam->where('academic_year_id', $yearId)))
+            ->when($teacherId, fn($query) => $query->where('teacher_id', $teacherId))
+            ->when($dateFrom, fn($query) => $query->whereHas('exam', fn($exam) => $exam->whereDate('exam_date', '>=', $dateFrom)))
+            ->when($dateTo, fn($query) => $query->whereHas('exam', fn($exam) => $exam->whereDate('exam_date', '<=', $dateTo)))
             ->join('exams', 'exams.id', '=', 'exam_invigilations.exam_id')
             ->select('exam_invigilations.*')
             ->orderBy('exams.exam_date')
@@ -1196,15 +1329,15 @@ class SchoolController extends Controller
         $audience = trim((string) $request->input('audience', ''));
         $type = trim((string) $request->input('type', ''));
         $published = $request->input('published', '');
-        $announcements = Announcement::when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+        $announcements = Announcement::when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
             $query->where('title', 'like', "%{$search}%")
                 ->orWhere('content', 'like', "%{$search}%")
                 ->orWhere('type', 'like', "%{$search}%")
                 ->orWhere('audience', 'like', "%{$search}%");
         }))
-            ->when($audience !== '', fn ($query) => $query->where('audience', $audience))
-            ->when($type !== '', fn ($query) => $query->where('type', $type))
-            ->when($published !== '', fn ($query) => $query->where('is_published', $published === 'published'))
+            ->when($audience !== '', fn($query) => $query->where('audience', $audience))
+            ->when($type !== '', fn($query) => $query->where('type', $type))
+            ->when($published !== '', fn($query) => $query->where('is_published', $published === 'published'))
             ->latest()->paginate(20)->withQueryString();
 
         return view('admin.school.announcements.index', [
@@ -1254,14 +1387,14 @@ class SchoolController extends Controller
         $active = $request->input('active', '');
         $fees = FeeNotice::with(['payments'])
             ->withCount('payments')
-            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('title', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
             }))
-            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
-            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
-            ->when($classId, fn ($query) => $query->where('class_id', $classId))
-            ->when($active !== '', fn ($query) => $query->where('is_active', $active === 'active'))
+            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+            ->when($semesterId, fn($query) => $query->where('semester_id', $semesterId))
+            ->when($classId, fn($query) => $query->where('class_id', $classId))
+            ->when($active !== '', fn($query) => $query->where('is_active', $active === 'active'))
             ->latest()->paginate(20)->withQueryString();
 
         return view('admin.school.fees.index', [
@@ -1342,7 +1475,7 @@ class SchoolController extends Controller
                 ->get(),
             'teachers' => Teacher::where(function ($query) use ($examInvigilation): void {
                 $query->where('status', 'active')
-                    ->when($examInvigilation, fn ($query) => $query->orWhere('id', $examInvigilation->teacher_id));
+                    ->when($examInvigilation, fn($query) => $query->orWhere('id', $examInvigilation->teacher_id));
             })->orderBy('full_name')->get(),
             'roles' => $this->invigilationRoles(),
         ];
@@ -1367,7 +1500,7 @@ class SchoolController extends Controller
 
         $duplicate = ExamInvigilation::where('exam_id', $data['exam_id'])
             ->where('teacher_id', $data['teacher_id'])
-            ->when($examInvigilation, fn ($query) => $query->whereKeyNot($examInvigilation->id))
+            ->when($examInvigilation, fn($query) => $query->whereKeyNot($examInvigilation->id))
             ->exists();
         if ($duplicate) {
             throw ValidationException::withMessages(['teacher_id' => 'Giáo viên đã được phân công trong kỳ thi này.']);
@@ -1375,7 +1508,7 @@ class SchoolController extends Controller
 
         $exam = Exam::findOrFail($data['exam_id']);
         $conflict = ExamInvigilation::where('teacher_id', $data['teacher_id'])
-            ->when($examInvigilation, fn ($query) => $query->whereKeyNot($examInvigilation->id))
+            ->when($examInvigilation, fn($query) => $query->whereKeyNot($examInvigilation->id))
             ->whereHas('exam', function ($query) use ($exam): void {
                 $query->whereKeyNot($exam->id)
                     ->whereDate('exam_date', $exam->exam_date);
@@ -1482,7 +1615,7 @@ class SchoolController extends Controller
             ->whereDate('week_start', $data['week_start'])
             ->where('weekday', $data['weekday'])
             ->where('period', $data['period'])
-            ->when($schedule, fn ($query) => $query->whereKeyNot($schedule->id))
+            ->when($schedule, fn($query) => $query->whereKeyNot($schedule->id))
             ->exists();
         if ($classConflict) {
             throw ValidationException::withMessages(['period' => 'Lớp đã có môn học ở thứ và tiết này.']);
@@ -1494,7 +1627,7 @@ class SchoolController extends Controller
                 ->whereDate('week_start', $data['week_start'])
                 ->where('weekday', $data['weekday'])
                 ->where('period', $data['period'])
-                ->when($schedule, fn ($query) => $query->whereKeyNot($schedule->id))
+                ->when($schedule, fn($query) => $query->whereKeyNot($schedule->id))
                 ->exists();
             if ($teacherConflict) {
                 throw ValidationException::withMessages(['teacher_id' => 'Giáo viên đã có lịch dạy ở lớp khác trong tiết này.']);
@@ -1525,7 +1658,7 @@ class SchoolController extends Controller
 
         $alreadyAssigned = SchoolClass::where('academic_year_id', $academicYearId)
             ->where('homeroom_teacher_id', $teacherId)
-            ->when($classId, fn ($query) => $query->whereKeyNot($classId))
+            ->when($classId, fn($query) => $query->whereKeyNot($classId))
             ->exists();
         if ($alreadyAssigned) {
             throw ValidationException::withMessages(['homeroom_teacher_id' => 'Giáo viên này đã là chủ nhiệm của một lớp khác trong năm học đã chọn.']);
@@ -1550,16 +1683,16 @@ class SchoolController extends Controller
         }
 
         $year = AcademicYear::firstOrCreate(
-            ['code' => $start.'-'.$end],
-            ['name' => $start.'-'.$end, 'starts_on' => $start.'-08-15', 'ends_on' => $end.'-05-31', 'is_current' => false]
+            ['code' => $start . '-' . $end],
+            ['name' => $start . '-' . $end, 'starts_on' => $start . '-08-15', 'ends_on' => $end . '-05-31', 'is_current' => false]
         );
         Semester::firstOrCreate(
             ['academic_year_id' => $year->id, 'number' => 1],
-            ['name' => 'Semester 1', 'starts_on' => $start.'-08-15', 'ends_on' => $start.'-12-31', 'is_current' => false]
+            ['name' => 'Semester 1', 'starts_on' => $start . '-08-15', 'ends_on' => $start . '-12-31', 'is_current' => false]
         );
         Semester::firstOrCreate(
             ['academic_year_id' => $year->id, 'number' => 2],
-            ['name' => 'Semester 2', 'starts_on' => $end.'-01-01', 'ends_on' => $end.'-05-31', 'is_current' => false]
+            ['name' => 'Semester 2', 'starts_on' => $end . '-01-01', 'ends_on' => $end . '-05-31', 'is_current' => false]
         );
 
         return $year;
@@ -1691,13 +1824,13 @@ class SchoolController extends Controller
         if (! $yearId) {
             throw ValidationException::withMessages(['academic_year_id' => 'Hệ thống chưa có năm học để lưu môn giảng dạy.']);
         }
-        $subjectIds = collect($data['subjects'] ?? [])->map(fn ($id) => (int) $id)->values();
-        $homeroomClassIds = collect($data['homeroom_class_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+        $subjectIds = collect($data['subjects'] ?? [])->map(fn($id) => (int) $id)->values();
+        $homeroomClassIds = collect($data['homeroom_class_ids'] ?? [])->map(fn($id) => (int) $id)->unique()->values();
 
         $existingHomeroomIds = $teacher->homeroomClasses()
             ->where('academic_year_id', $yearId)
             ->pluck('id')
-            ->map(fn ($id) => (int) $id);
+            ->map(fn($id) => (int) $id);
         $hasNewHomeroomAssignment = $homeroomClassIds->diff($existingHomeroomIds)->isNotEmpty();
         if ($teacher->status !== 'active' && $request->boolean('is_homeroom_teacher') && $hasNewHomeroomAssignment) {
             throw ValidationException::withMessages(['status' => 'Giáo viên tạm nghỉ hoặc ngừng công tác không thể nhận phân công chủ nhiệm.']);
@@ -1723,7 +1856,7 @@ class SchoolController extends Controller
         if ($subjectIds->isNotEmpty()) {
             $now = now();
             DB::table('teacher_subject')->insert(
-                $subjectIds->map(fn (int $subjectId) => [
+                $subjectIds->map(fn(int $subjectId) => [
                     'teacher_id' => $teacher->id,
                     'subject_id' => $subjectId,
                     'academic_year_id' => $yearId,

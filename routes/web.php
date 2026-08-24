@@ -259,6 +259,8 @@ Route::middleware('auth')->prefix('admin/school')->name('admin.school.')->group(
 
     Route::get('/assignments', [SchoolController::class, 'assignments'])->name('assignments.index')->middleware('permission:assignments.manage');
     Route::post('/assignments', [SchoolController::class, 'storeAssignment'])->name('assignments.store')->middleware('permission:assignments.manage');
+    Route::get('/assignments/{assignment}/edit', [SchoolController::class, 'editAssignment'])->name('assignments.edit')->middleware('permission:assignments.manage');
+    Route::put('/assignments/{assignment}', [SchoolController::class, 'updateAssignment'])->name('assignments.update')->middleware('permission:assignments.manage');
     Route::delete('/assignments/{assignment}', [SchoolController::class, 'destroyAssignment'])->name('assignments.destroy')->middleware('permission:assignments.manage');
 
     Route::get('/scores', [SchoolController::class, 'scores'])->name('scores.index')->middleware('permission:scores.manage');
