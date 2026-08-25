@@ -25,6 +25,7 @@ use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use App\Models\User;
 use App\Notifications\ExamInvigilationAssigned;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -35,20 +36,273 @@ use Illuminate\Validation\ValidationException;
 
 class SchoolController extends Controller
 {
-    public function dashboard()
+
+
+    public function dashboard(Request $request)
     {
-        $year = $this->currentYear();
+
+        $academicYears = DB::table('academic_years')
+            ->select('id', 'name')
+            ->orderByDesc('id')
+            ->get();
+
+        $currentYear = $this->currentYear();
+
+        $filterAcademicYearId = $request->filled('academic_year_id')
+            ? (int) $request->input('academic_year_id')
+            : ($currentYear?->id);
+
+        $filterGradeId = $request->filled('grade_id')
+            ? (int) $request->input('grade_id')
+            : null;
+
+        $filterClassId = $request->filled('class_id')
+            ? (int) $request->input('class_id')
+            : null;
+
+
+        $filterDateFrom = $request->filled('date_from')
+            ? Carbon::parse($request->input('date_from'))->startOfDay()
+            : today()->subDays(29)->startOfDay();
+
+        $filterDateTo = $request->filled('date_to')
+            ? Carbon::parse($request->input('date_to'))->endOfDay()
+            : today()->endOfDay();
+
+        if ($filterDateFrom->gt($filterDateTo)) {
+            [$filterDateFrom, $filterDateTo] = [
+                $filterDateTo->copy()->startOfDay(),
+                $filterDateFrom->copy()->endOfDay(),
+            ];
+        }
+
+        $grades = DB::table('grades')
+            ->select('id', 'name', 'level')
+            ->orderBy('level')
+            ->get();
+
+        $classesFilter = DB::table('classes')
+            ->select('id', 'name', 'grade_id')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+
+        $year = $filterAcademicYearId
+            ? $academicYears->firstWhere('id', $filterAcademicYearId)
+            : $currentYear;
+        $studentQuery = DB::table('enrollments')
+            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+            ->where('enrollments.academic_year_id', $filterAcademicYearId)
+            ->where('enrollments.status', 'active');
+
+        if ($filterGradeId) {
+            $studentQuery->where('classes.grade_id', $filterGradeId);
+        }
+
+        if ($filterClassId) {
+            $studentQuery->where('classes.id', $filterClassId);
+        }
+
+        $activeStudents = (clone $studentQuery)
+            ->distinct('enrollments.student_id')
+            ->count('enrollments.student_id');
+
+        $activeClasses = (clone $studentQuery)
+            ->distinct('classes.id')
+            ->count('classes.id');
+
+
+        $gradeBreakdownQuery = DB::table('enrollments')
+            ->join('classes', 'classes.id', '=', 'enrollments.class_id')
+            ->join('grades', 'grades.id', '=', 'classes.grade_id')
+            ->where('enrollments.academic_year_id', $filterAcademicYearId)
+            ->where('enrollments.status', 'active');
+
+        if ($filterGradeId) {
+            $gradeBreakdownQuery->where('grades.id', $filterGradeId);
+        }
+
+        if ($filterClassId) {
+            $gradeBreakdownQuery->where('classes.id', $filterClassId);
+        }
+
+        $gradeBreakdown = $gradeBreakdownQuery
+            ->select(
+                'grades.id',
+                'grades.name',
+                'grades.level',
+                DB::raw('count(distinct enrollments.student_id) as total')
+            )
+            ->groupBy('grades.id', 'grades.name', 'grades.level')
+            ->orderBy('grades.level')
+            ->get();
+
+        $attendance = $filterAcademicYearId
+            ? AttendanceRecord::where('academic_year_id', $filterAcademicYearId)
+            ->whereBetween('attended_on', [
+                $filterDateFrom->toDateString(),
+                $filterDateTo->toDateString(),
+            ])
+            ->select(
+                'status',
+                DB::raw('count(*) as total')
+            )
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            : collect();
+
+
+        $teachers = Teacher::where('status', 'active')->count();
+
+        $subjects = Subject::where('is_active', true)->count();
+
+        $scoreRatings = $filterAcademicYearId
+            ? SubjectResult::where('academic_year_id', $filterAcademicYearId)
+            ->select(
+                'rating',
+                DB::raw('count(*) as total')
+            )
+            ->groupBy('rating')
+            ->pluck('total', 'rating')
+            : collect();
+
+        $scoreCount = $filterAcademicYearId
+            ? Score::where('academic_year_id', $filterAcademicYearId)->count()
+            : 0;
+
+        $paidFees = 0;
+        $outstandingFees = 0;
+
+        if ($filterAcademicYearId) {
+            $feeBase = DB::table('fee_payments')
+                ->join(
+                    'fee_notices',
+                    'fee_notices.id',
+                    '=',
+                    'fee_payments.fee_notice_id'
+                )
+                ->where(
+                    'fee_notices.academic_year_id',
+                    $filterAcademicYearId
+                );
+
+            $paidFees = (clone $feeBase)
+                ->where('fee_payments.status', 'paid')
+                ->sum('fee_payments.amount');
+
+            $outstandingFees = (clone $feeBase)
+                ->whereIn(
+                    'fee_payments.status',
+                    ['unpaid', 'partial']
+                )
+                ->sum('fee_payments.amount');
+        }
+
+        $upcomingExamsQuery = Exam::with([
+            'subject',
+            'class',
+        ])
+            ->when(
+                $filterAcademicYearId,
+                fn($query) => $query->where(
+                    'academic_year_id',
+                    $filterAcademicYearId
+                )
+            )
+            ->whereBetween(
+                'exam_date',
+                [
+                    $filterDateFrom->toDateString(),
+                    $filterDateTo->toDateString(),
+                ]
+            )
+            ->orderBy('exam_date')
+            ->limit(10);
+
+
+        if ($filterClassId) {
+            $upcomingExamsQuery->where('class_id', $filterClassId);
+        } elseif ($filterGradeId) {
+            $gradeClassIds = DB::table('classes')
+                ->where('grade_id', $filterGradeId)
+                ->pluck('id');
+
+            $upcomingExamsQuery->whereIn('class_id', $gradeClassIds);
+        }
+
+        $upcomingExams = $upcomingExamsQuery->get();
+
+        $examCountQuery = Exam::query()
+            ->when(
+                $filterAcademicYearId,
+                fn($query) => $query->where(
+                    'academic_year_id',
+                    $filterAcademicYearId
+                )
+            )
+            ->whereBetween(
+                'exam_date',
+                [
+                    $filterDateFrom->toDateString(),
+                    $filterDateTo->toDateString(),
+                ]
+            );
+
+        if ($filterClassId) {
+            $examCountQuery->where('class_id', $filterClassId);
+        } elseif ($filterGradeId) {
+            $gradeClassIds = DB::table('classes')
+                ->where('grade_id', $filterGradeId)
+                ->pluck('id');
+
+            $examCountQuery->whereIn('class_id', $gradeClassIds);
+        }
+
+        $examCount = $examCountQuery->count();
+
+        $recentAnnouncements = Announcement::where(
+            'is_published',
+            true
+        )
+            ->latest('published_at')
+            ->limit(5)
+            ->get();
 
         return view('admin.school.dashboard', [
             'year' => $year,
-            'students' => Student::where('status', 'studying')->count(),
-            'teachers' => Teacher::where('status', 'active')->count(),
-            'classes' => $year?->classes()->where('status', 'active')->count() ?? 0,
-            'subjects' => Subject::where('is_active', true)->count(),
-            'recentAnnouncements' => Announcement::where('is_published', true)->latest('published_at')->limit(5)->get(),
-            'upcomingExams' => Exam::with(['subject', 'class'])->whereDate('exam_date', '>=', today())->orderBy('exam_date')->limit(5)->get(),
+
+            'academicYears' => $academicYears,
+            'grades' => $grades,
+            'classesFilter' => $classesFilter,
+
+            'filterAcademicYearId' => $filterAcademicYearId,
+            'filterGradeId' => $filterGradeId,
+            'filterClassId' => $filterClassId,
+
+            'filterDateFrom' => $filterDateFrom->format('Y-m-d'),
+            'filterDateTo' => $filterDateTo->format('Y-m-d'),
+
+            'students' => $activeStudents,
+            'teachers' => $teachers,
+            'classes' => $activeClasses,
+            'subjects' => $subjects,
+
+            'recentAnnouncements' => $recentAnnouncements,
+            'upcomingExams' => $upcomingExams,
+
+            'attendance' => $attendance,
+            'gradeBreakdown' => $gradeBreakdown,
+            'scoreRatings' => $scoreRatings,
+
+            'paidFees' => $paidFees,
+            'outstandingFees' => $outstandingFees,
+
+            'scoreCount' => $scoreCount,
+            'examCount' => $examCount,
         ]);
     }
+
+
 
     public function students(Request $request)
     {

@@ -97,9 +97,7 @@ Route::middleware('auth')
             ->middleware('permission:admin.access')
             ->name('dashboard');
 
-        /*
-        | ROLES
-        */
+        //   ROLES
 
         Route::get('/roles', [RoleController::class, 'index'])
             ->name('roles.index')
@@ -125,9 +123,7 @@ Route::middleware('auth')
             ->name('roles.destroy')
             ->middleware('permission:roles.delete');
 
-        /*
-        | USERS
-        */
+        //    USERS
 
         Route::get('/users', [UserController::class, 'index'])
             ->name('users.index')
@@ -153,9 +149,7 @@ Route::middleware('auth')
             ->name('users.destroy')
             ->middleware('permission:users.delete');
 
-        /*
-        | PERMISSIONS
-        */
+        //  PERMISSIONS
 
         Route::get('/permissions', [PermissionController::class, 'index'])
             ->name('permissions.index')
@@ -181,9 +175,7 @@ Route::middleware('auth')
             ->name('permissions.destroy')
             ->middleware('permission:permissions.delete');
 
-        /*
-        | MENUS
-        */
+        //   | MENUS
 
         Route::get('/menus', [MenuController::class, 'index'])
             ->name('menus.index')
@@ -209,6 +201,8 @@ Route::middleware('auth')
             ->name('menus.destroy')
             ->middleware('permission:menus.delete');
     });
+
+// School Management Routes
 
 Route::middleware('auth')->prefix('admin/school')->name('admin.school.')->group(function () {
     Route::get('/', [SchoolController::class, 'dashboard'])->name('dashboard')->middleware('permission:school.dashboard');
@@ -299,11 +293,7 @@ Route::middleware('auth')->prefix('admin/school')->name('admin.school.')->group(
     Route::delete('/fees/{fee}', [SchoolController::class, 'destroyFee'])->name('fees.destroy')->middleware('permission:fees.manage');
 });
 
-/*
-|----------------------------------------------------------------------
-| DYNAMIC MENU WORKSPACE
-|----------------------------------------------------------------------
-*/
+// Dynamic Menu Routes
 
 Route::middleware('auth')->prefix('workspace')->name('dynamic.menus.')->group(function () {
     Route::get('/{menu:slug}', [DynamicMenuController::class, 'show'])->name('show');
