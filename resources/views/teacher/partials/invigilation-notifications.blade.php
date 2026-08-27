@@ -17,6 +17,12 @@
             @if (!empty($notification->data['details']))
                 <small class="text-secondary">{{ $notification->data['details'] }}</small>
             @endif
+            @if (!$notification->read_at)
+                <form method="POST" action="{{ route('teacher.notifications.read', $notification->id) }}" class="mt-2">
+                    @csrf
+                    <button class="btn btn-sm btn-light" type="submit"><i data-lucide="check"></i> Đã đọc</button>
+                </form>
+            @endif
         </div>
     @endforeach
 @endif

@@ -5,6 +5,7 @@
 @section('content')
     @php($weekdayNames = ['', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'])
     @php($section = request('section'))
+    @php($guardianByRelationship = $student->guardians->keyBy('pivot.relationship'))
     <div class="page-heading page-heading-inline">
         <div class="d-flex align-items-center gap-3">
             @if ($student->avatar_path)
@@ -19,9 +20,28 @@
             </div>
         </div>
         <div class="d-flex gap-2"><a href="{{ route('profile.show') }}" class="btn btn-light"><i
-                    data-lucide="user-round-cog"></i> Hồ sơ</a><a href="{{ route('student.payments') }}"
-                class="btn btn-light"><i data-lucide="receipt-text"></i> Học phí</a></div>
+                    data-lucide="user-round-cog"></i> Hồ sơ</a>@if(auth()->user()->hasPermission('fees.view'))<a href="{{ route('student.payments') }}"
+                class="btn btn-light"><i data-lucide="receipt-text"></i> Học phí</a>@endif</div>
     </div>
+
+    @if (!$section || $section === 'class')
+        <div class="card table-card mb-4">
+            <div class="card-body border-bottom"><h2 class="panel-title mb-0">Thông tin phụ huynh</h2></div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Quan hệ</th><th>Họ tên</th><th>Liên hệ</th><th>Nghề nghiệp</th><th>Tôn giáo</th><th>Nơi làm việc</th></tr></thead>
+                    <tbody>
+                        @foreach (['father' => 'Bố', 'mother' => 'Mẹ'] as $relationship => $label)
+                            @php($guardian = $guardianByRelationship->get($relationship))
+                            <tr><td><strong>{{ $label }}</strong></td><td>{{ $guardian?->full_name ?: '-' }}</td>
+                                <td>{{ $guardian?->phone ?: '-' }}@if($guardian?->email)<small class="d-block text-secondary">{{ $guardian->email }}</small>@endif</td>
+                                <td>{{ $guardian?->occupation ?: '-' }}</td><td>{{ $guardian?->religion ?: '-' }}</td><td>{{ $guardian?->workplace ?: '-' }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 
     @if (!$section || in_array($section, ['class', 'scores', 'attendance'], true))
         <div class="overview-grid">
@@ -49,7 +69,7 @@
                         {{ ($attendance['late'] ?? collect())->count() }} đi muộn</p>
                 </div>
             @endif
-            @if (!$section)
+            @if (!$section && auth()->user()->hasPermission('fees.view'))
                 <a class="overview-item text-decoration-none" href="{{ route('student.payments') }}"><span
                         class="overview-icon"><i data-lucide="wallet-cards"></i></span>
                     <h2>Học phí cần đóng</h2>
@@ -200,7 +220,7 @@
                 </div>
             </div>
         @endif
-        @if (!$section)
+        @if (!$section && auth()->user()->hasPermission('fees.view'))
             <div class="col-xl-5">
                 <div id="fees" class="card table-card h-100">
                     <div class="card-body border-bottom d-flex justify-content-between align-items-center">

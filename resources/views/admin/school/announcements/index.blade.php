@@ -38,6 +38,7 @@
                                     class="d-block text-secondary">{{ \Illuminate\Support\Str::limit($announcement->content, 100) }}</small>
                             </td>
                             <td>{{ ['all' => 'Toàn trường', 'students' => 'Học sinh', 'teachers' => 'Giáo viên'][$announcement->audience] ?? $announcement->audience }}
+                                @if($announcement->class)<small class="d-block text-secondary">Lớp {{ $announcement->class->name }}</small>@endif
                             </td>
                             <td>{{ $announcement->type }}</td>
                             <td>{{ $announcement->published_at?->format('d/m/Y H:i') ?: '-' }}</td>

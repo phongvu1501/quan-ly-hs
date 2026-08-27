@@ -17,6 +17,10 @@
                 <div class="col-md-6"><label class="form-label">Lớp</label><select name="class_id" class="form-select" required>@foreach($classes as $class)<option value="{{ $class->id }}" data-year="{{ $class->academic_year_id }}" @selected(old('class_id', $assignment?->class_id) == $class->id)>{{ $class->name }} · {{ $class->grade?->name }} · {{ $class->academicYear?->name }}</option>@endforeach</select></div>
                 <div class="col-md-6"><label class="form-label">Môn học</label><select name="subject_id" class="form-select" required>@foreach($subjects as $subject)<option value="{{ $subject->id }}" @selected(old('subject_id', $assignment?->subject_id) == $subject->id)>{{ $subject->name }} · {{ $subject->code }}</option>@endforeach</select></div>
                 <div class="col-md-6"><label class="form-label">Giáo viên</label><select name="teacher_id" class="form-select" required>@foreach($teachers as $teacher)<option value="{{ $teacher->id }}" @selected(old('teacher_id', $assignment?->teacher_id) == $teacher->id)>{{ $teacher->full_name }} · {{ $teacher->teacher_code }}</option>@endforeach</select></div>
+                <div class="col-md-6"><label class="form-label">Trạng thái phân công</label><select name="status" class="form-select" required>
+                    <option value="active" @selected(old('status', $assignment?->status ?: 'active') === 'active')>Đang giảng dạy</option>
+                    <option value="inactive" @selected(old('status', $assignment?->status) === 'inactive')>Đã kết thúc</option>
+                </select></div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-4"><a href="{{ route('admin.school.assignments.index') }}" class="btn btn-light">Hủy</a><button class="btn btn-primary"><i data-lucide="save"></i> Lưu</button></div>
         </form>

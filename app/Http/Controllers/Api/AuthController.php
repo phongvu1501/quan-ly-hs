@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\JwtService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly JwtService $jwt) {}
+
     /**
      * Đăng ký
      */
@@ -27,7 +30,7 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        $token = $this->jwt->issue($user);
 
         return response()->json([
             'success' => true,
@@ -35,6 +38,7 @@ class AuthController extends Controller
             'user' => $user,
             'token' => $token,
             'token_type' => 'Bearer',
+            'expires_in' => $this->jwt->ttl() * 60,
         ], 201);
     }
 
@@ -56,10 +60,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // Xóa token cũ nếu muốn mỗi lần login chỉ có 1 token
-        $user->tokens()->delete();
-
-        $token = $user->createToken('api-token')->plainTextToken;
+        $token = $this->jwt->issue($user);
 
         return response()->json([
             'success' => true,
@@ -67,6 +68,7 @@ class AuthController extends Controller
             'user' => $user,
             'token' => $token,
             'token_type' => 'Bearer',
+            'expires_in' => $this->jwt->ttl() * 60,
         ]);
     }
 
@@ -75,11 +77,24 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $request->user()->increment('jwt_version');
 
         return response()->json([
             'success' => true,
             'message' => 'Đăng xuất thành công',
+        ]);
+    }
+
+    public function refresh(Request $request)
+    {
+        $request->user()->increment('jwt_version');
+        $token = $this->jwt->issue($request->user()->refresh());
+
+        return response()->json([
+            'success' => true,
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'expires_in' => $this->jwt->ttl() * 60,
         ]);
     }
 

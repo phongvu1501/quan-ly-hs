@@ -33,8 +33,11 @@
                         <input id="avatar" type="file" name="avatar" class="form-control" accept="image/*">
                         <div class="form-text">JPG, PNG hoặc WebP, tối đa 2MB.</div>
                     </div>
-                    <div class="col-md-4"><label class="form-label">Mã giáo viên</label><input name="teacher_code"
-                            class="form-control" value="{{ old('teacher_code', $teacher?->teacher_code) }}" required></div>
+                    <div class="col-md-4"><label class="form-label">Mã giáo viên</label><input
+                            class="form-control" value="{{ $teacher?->teacher_code }}"
+                            placeholder="Tự động tạo sau khi lưu" readonly>
+                        <div class="form-text">Định dạng tự động: GV + 6 chữ số.</div>
+                    </div>
                     <div class="col-md-8"><label class="form-label">Họ và tên</label><input name="full_name"
                             class="form-control" value="{{ old('full_name', $teacher?->full_name) }}" required></div>
                     <div class="col-md-4"><label class="form-label">Ngày sinh</label><input type="date"
@@ -63,7 +66,7 @@
                         </div>
                     </div>
                     <div class="col-md-6"><label class="form-label">Điện thoại</label><input name="phone"
-                            class="form-control" value="{{ old('phone', $teacher?->phone) }}"></div>
+                            class="form-control" value="{{ old('phone', $teacher?->phone) }}" type="number" maxlength="10"></div>
                     <div class="col-md-6"><label class="form-label">Chuyên môn</label><input name="specialization"
                             class="form-control" value="{{ old('specialization', $teacher?->specialization) }}"
                             placeholder="Toán, Vật lý..."></div>

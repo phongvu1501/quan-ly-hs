@@ -19,6 +19,24 @@ class Teacher extends Model
         return ['date_of_birth' => 'date', 'hire_date' => 'date'];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (Teacher $teacher): void {
+            if (blank($teacher->teacher_code)) {
+                $teacher->teacher_code = static::generateCode();
+            }
+        });
+    }
+
+    private static function generateCode(): string
+    {
+        do {
+            $code = 'GV'.str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        } while (static::where('teacher_code', $code)->exists());
+
+        return $code;
+    }
+
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function homeroomClasses(): HasMany { return $this->hasMany(SchoolClass::class, 'homeroom_teacher_id'); }
     public function assignments(): HasMany { return $this->hasMany(TeachingAssignment::class); }

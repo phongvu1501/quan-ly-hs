@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\JwtService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -10,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
+    public function __construct(private readonly JwtService $jwt) {}
+
     public function show()
     {
         $user = auth()->user()->load([
@@ -37,15 +40,32 @@ class ProfileController extends Controller
             throw ValidationException::withMessages(['password' => 'Bạn phải đặt mật khẩu mới trước khi tiếp tục.']);
         }
 
+        $passwordChanged = ! empty($data['password']);
         $user->update([
             'name' => $data['name'],
             'email' => $data['email'],
             ...($request->hasFile('avatar') ? ['avatar_path' => $this->replaceAvatar($request, $user->avatar_path)] : []),
             ...(!empty($data['password']) ? ['password' => Hash::make($data['password'])] : []),
-            ...(!empty($data['password']) ? ['must_change_password' => false] : []),
+            ...($passwordChanged ? ['must_change_password' => false] : []),
         ]);
 
-        return back()->with('success', 'Đã cập nhật hồ sơ cá nhân.');
+        $response = back()->with('success', 'Đã cập nhật hồ sơ cá nhân.');
+        if ($passwordChanged) {
+            $user->increment('jwt_version');
+            $response->withCookie(cookie(
+                $this->jwt->cookieName(),
+                $this->jwt->issue($user->refresh()),
+                $this->jwt->ttl(),
+                '/',
+                config('session.domain'),
+                (bool) config('session.secure'),
+                true,
+                false,
+                config('session.same_site', 'lax')
+            ));
+        }
+
+        return $response;
     }
 
     private function replaceAvatar(Request $request, ?string $oldPath): string

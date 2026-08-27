@@ -18,8 +18,7 @@ class TeacherPortalController extends Controller
 {
     public function dashboard()
     {
-        $teacher = auth()->user()->teacherProfile;
-        abort_unless($teacher, 403, 'Tài khoản chưa được liên kết với hồ sơ giáo viên.');
+        $teacher = $this->teacher();
 
         $year = $this->currentYear();
         $assignments = $teacher->assignments()
@@ -152,6 +151,14 @@ class TeacherPortalController extends Controller
             'teacher', 'assignments', 'assignment', 'students', 'scoreMap', 'subjectAverages',
             'academicSummaries', 'classAverage', 'topStudent', 'semesterId'
         ));
+    }
+
+    public function markNotificationRead(string $notification)
+    {
+        $record = auth()->user()->notifications()->findOrFail($notification);
+        $record->markAsRead();
+
+        return back()->with('success', 'Đã đánh dấu thông báo là đã đọc.');
     }
 
     public function storeScore(Request $request)
@@ -635,9 +642,13 @@ class TeacherPortalController extends Controller
         return Announcement::query()
             ->where('is_published', true)
             ->where(function ($query) use ($classIds): void {
-                $query->whereIn('audience', ['all', 'teachers'])
+                $query->where('audience', 'all')
                     ->orWhere(function ($query) use ($classIds): void {
-                        $query->whereNotNull('class_id')->whereIn('class_id', $classIds);
+                        $query->where('audience', 'teachers')
+                            ->where(function ($query) use ($classIds): void {
+                                $query->whereNull('class_id')
+                                    ->orWhereIn('class_id', $classIds);
+                            });
                     });
             })
             ->where(function ($query): void {

@@ -13,6 +13,7 @@ use App\Models\ExamResult;
 use App\Models\FeeNotice;
 use App\Models\FeePayment;
 use App\Models\Grade;
+use App\Models\Guardian;
 use App\Models\Role;
 use App\Models\Schedule;
 use App\Models\SchoolClass;
@@ -81,9 +82,16 @@ class SchoolController extends Controller
             ->orderBy('level')
             ->get();
 
+        $classScope = SchoolClass::query()
+            ->where('status', 'active')
+            ->when($filterAcademicYearId, fn($query) => $query->where('academic_year_id', $filterAcademicYearId))
+            ->when($filterGradeId, fn($query) => $query->where('grade_id', $filterGradeId))
+            ->when($filterClassId, fn($query) => $query->whereKey($filterClassId));
+
         $classesFilter = DB::table('classes')
             ->select('id', 'name', 'grade_id')
             ->where('status', 'active')
+            ->when($filterAcademicYearId, fn($query) => $query->where('academic_year_id', $filterAcademicYearId))
             ->orderBy('name')
             ->get();
 
@@ -103,13 +111,23 @@ class SchoolController extends Controller
             $studentQuery->where('classes.id', $filterClassId);
         }
 
+        $filteredClassIds = (clone $classScope)->pluck('id');
+
+        $filteredStudentIds = (clone $studentQuery)
+            ->select('enrollments.student_id')
+            ->distinct()
+            ->pluck('enrollments.student_id');
+
         $activeStudents = (clone $studentQuery)
             ->distinct('enrollments.student_id')
             ->count('enrollments.student_id');
 
-        $activeClasses = (clone $studentQuery)
-            ->distinct('classes.id')
-            ->count('classes.id');
+        $activeClasses = $filteredClassIds->count();
+
+        $studentCountsByClass = (clone $studentQuery)
+            ->select('classes.id', DB::raw('count(distinct enrollments.student_id) as total'))
+            ->groupBy('classes.id')
+            ->pluck('total', 'classes.id');
 
 
         $gradeBreakdownQuery = DB::table('enrollments')
@@ -139,6 +157,7 @@ class SchoolController extends Controller
 
         $attendance = $filterAcademicYearId
             ? AttendanceRecord::where('academic_year_id', $filterAcademicYearId)
+            ->whereIn('class_id', $filteredClassIds)
             ->whereBetween('attended_on', [
                 $filterDateFrom->toDateString(),
                 $filterDateTo->toDateString(),
@@ -151,52 +170,156 @@ class SchoolController extends Controller
             ->pluck('total', 'status')
             : collect();
 
+        $attendanceDetails = $filterAcademicYearId
+            ? AttendanceRecord::with(['student', 'class', 'subject'])
+                ->where('academic_year_id', $filterAcademicYearId)
+                ->whereIn('class_id', $filteredClassIds)
+                ->whereBetween('attended_on', [
+                    $filterDateFrom->toDateString(),
+                    $filterDateTo->toDateString(),
+                ])
+                ->whereIn('status', ['absent', 'late', 'excused'])
+                ->latest('attended_on')
+                ->latest('id')
+                ->limit(50)
+                ->get()
+            : collect();
 
-        $teachers = Teacher::where('status', 'active')->count();
+        $attendanceTrend = $filterAcademicYearId
+            ? AttendanceRecord::where('academic_year_id', $filterAcademicYearId)
+                ->whereIn('class_id', $filteredClassIds)
+                ->whereBetween('attended_on', [
+                    $filterDateFrom->toDateString(),
+                    $filterDateTo->toDateString(),
+                ])
+                ->select('attended_on', 'status', DB::raw('count(*) as total'))
+                ->groupBy('attended_on', 'status')
+                ->orderBy('attended_on')
+                ->get()
+                ->groupBy(fn($row) => Carbon::parse($row->attended_on)->format('Y-m-d'))
+                ->map(function ($rows, string $date): array {
+                    $counts = $rows->pluck('total', 'status');
+
+                    return [
+                        'date' => $date,
+                        'present' => (int) ($counts['present'] ?? 0),
+                        'absent' => (int) ($counts['absent'] ?? 0),
+                        'late' => (int) ($counts['late'] ?? 0),
+                        'excused' => (int) ($counts['excused'] ?? 0),
+                        'total' => (int) $counts->sum(),
+                    ];
+                })
+                ->take(-14)
+                ->values()
+            : collect();
+
+
+        $teachers = Teacher::where('status', 'active')
+            ->when($filterAcademicYearId, function ($query) use ($filterAcademicYearId, $filteredClassIds): void {
+                $query->where(function ($query) use ($filterAcademicYearId, $filteredClassIds): void {
+                    $query->whereHas('assignments', fn($assignment) => $assignment
+                        ->where('academic_year_id', $filterAcademicYearId)
+                        ->whereIn('class_id', $filteredClassIds))
+                        ->orWhereHas('homeroomClasses', fn($class) => $class
+                            ->where('academic_year_id', $filterAcademicYearId)
+                            ->whereIn('id', $filteredClassIds));
+                });
+            })
+            ->count();
 
         $subjects = Subject::where('is_active', true)->count();
 
-        $scoreRatings = $filterAcademicYearId
-            ? SubjectResult::where('academic_year_id', $filterAcademicYearId)
-            ->select(
-                'rating',
-                DB::raw('count(*) as total')
-            )
-            ->groupBy('rating')
-            ->pluck('total', 'rating')
+        $scoreAverageDetails = $filterAcademicYearId
+            ? Score::join('students', 'students.id', '=', 'scores.student_id')
+                ->where('scores.academic_year_id', $filterAcademicYearId)
+                ->whereIn('scores.student_id', $filteredStudentIds)
+                ->select(
+                    'scores.student_id',
+                    'students.student_code',
+                    'students.full_name',
+                    DB::raw('avg(scores.score) as average_score'),
+                    DB::raw('count(scores.id) as score_count')
+                )
+                ->groupBy('scores.student_id', 'students.student_code', 'students.full_name')
+                ->orderByDesc('average_score')
+                ->get()
             : collect();
 
+        $scoreRatings = collect([
+            'excellent' => $scoreAverageDetails->where('average_score', '>=', 8)->count(),
+            'good' => $scoreAverageDetails->filter(fn($row) => $row->average_score >= 6.5 && $row->average_score < 8)->count(),
+            'average' => $scoreAverageDetails->filter(fn($row) => $row->average_score >= 5 && $row->average_score < 6.5)->count(),
+            'weak' => $scoreAverageDetails->where('average_score', '<', 5)->count(),
+        ]);
+
         $scoreCount = $filterAcademicYearId
-            ? Score::where('academic_year_id', $filterAcademicYearId)->count()
+            ? Score::where('academic_year_id', $filterAcademicYearId)
+            ->whereIn('class_id', $filteredClassIds)
+            ->count()
             : 0;
 
-        $paidFees = 0;
-        $outstandingFees = 0;
+        $feeNotices = $filterAcademicYearId
+            ? FeeNotice::with([
+                'class.grade',
+                'payments' => fn($query) => $query->whereIn('student_id', $filteredStudentIds),
+            ])
+                ->where('academic_year_id', $filterAcademicYearId)
+                ->where('is_active', true)
+                ->where(function ($query) use ($filteredClassIds): void {
+                    $query->whereNull('class_id')->orWhereIn('class_id', $filteredClassIds);
+                })
+                ->orderBy('due_on')
+                ->get()
+            : collect();
 
-        if ($filterAcademicYearId) {
-            $feeBase = DB::table('fee_payments')
-                ->join(
-                    'fee_notices',
-                    'fee_notices.id',
-                    '=',
-                    'fee_payments.fee_notice_id'
-                )
-                ->where(
-                    'fee_notices.academic_year_id',
-                    $filterAcademicYearId
-                );
+        $feeBreakdown = $feeNotices->map(function (FeeNotice $notice) use ($activeStudents, $studentCountsByClass): array {
+            $studentCount = $notice->class_id
+                ? (int) ($studentCountsByClass[$notice->class_id] ?? 0)
+                : (int) $activeStudents;
+            $expected = (float) $notice->amount * $studentCount;
+            $paidPayments = $notice->payments->where('status', 'paid');
+            $paid = (float) $paidPayments->sum('amount');
 
-            $paidFees = (clone $feeBase)
-                ->where('fee_payments.status', 'paid')
-                ->sum('fee_payments.amount');
+            return [
+                'notice' => $notice,
+                'student_count' => $studentCount,
+                'paid_students' => $paidPayments->pluck('student_id')->unique()->count(),
+                'expected' => $expected,
+                'paid' => $paid,
+                'outstanding' => max(0, $expected - $paid),
+                'overdue' => $notice->due_on?->isPast() && $expected > $paid,
+            ];
+        });
 
-            $outstandingFees = (clone $feeBase)
-                ->whereIn(
-                    'fee_payments.status',
-                    ['unpaid', 'partial']
-                )
-                ->sum('fee_payments.amount');
-        }
+        $paidFees = (float) $feeBreakdown->sum('paid');
+        $outstandingFees = (float) $feeBreakdown->sum('outstanding');
+
+        $classOverview = (clone $classScope)
+            ->with(['grade', 'homeroomTeacher'])
+            ->withCount([
+                'enrollments as active_students_count' => fn($query) => $query
+                    ->where('academic_year_id', $filterAcademicYearId)
+                    ->where('status', 'active'),
+                'assignments as active_assignments_count' => fn($query) => $query
+                    ->where('academic_year_id', $filterAcademicYearId)
+                    ->where('status', 'active'),
+                'schedules as scheduled_periods_count' => fn($query) => $query
+                    ->where('academic_year_id', $filterAcademicYearId),
+            ])
+            ->orderBy('name')
+            ->get();
+
+        $classesWithoutHomeroom = $classOverview->whereNull('homeroom_teacher_id')->count();
+        $classesWithoutAssignments = $classOverview->where('active_assignments_count', 0)->count();
+        $activeAssignments = TeachingAssignment::where('academic_year_id', $filterAcademicYearId)
+            ->whereIn('class_id', $filteredClassIds)
+            ->where('status', 'active')
+            ->count();
+        $unassignedSchedules = Schedule::where('academic_year_id', $filterAcademicYearId)
+            ->whereIn('class_id', $filteredClassIds)
+            ->whereNull('teacher_id')
+            ->whereDate('week_start', '>=', today()->startOfWeek())
+            ->count();
 
         $upcomingExamsQuery = Exam::with([
             'subject',
@@ -217,7 +340,7 @@ class SchoolController extends Controller
                 ]
             )
             ->orderBy('exam_date')
-            ->limit(10);
+            ->limit(30);
 
 
         if ($filterClassId) {
@@ -260,12 +383,12 @@ class SchoolController extends Controller
 
         $examCount = $examCountQuery->count();
 
-        $recentAnnouncements = Announcement::where(
+        $recentAnnouncements = Announcement::with('class')->where(
             'is_published',
             true
         )
             ->latest('published_at')
-            ->limit(5)
+            ->limit(8)
             ->get();
 
         return view('admin.school.dashboard', [
@@ -274,7 +397,6 @@ class SchoolController extends Controller
             'academicYears' => $academicYears,
             'grades' => $grades,
             'classesFilter' => $classesFilter,
-
             'filterAcademicYearId' => $filterAcademicYearId,
             'filterGradeId' => $filterGradeId,
             'filterClassId' => $filterClassId,
@@ -291,14 +413,23 @@ class SchoolController extends Controller
             'upcomingExams' => $upcomingExams,
 
             'attendance' => $attendance,
+            'attendanceDetails' => $attendanceDetails,
+            'attendanceTrend' => $attendanceTrend,
             'gradeBreakdown' => $gradeBreakdown,
             'scoreRatings' => $scoreRatings,
+            'scoreAverageDetails' => $scoreAverageDetails->take(50),
+            'classOverview' => $classOverview,
 
             'paidFees' => $paidFees,
             'outstandingFees' => $outstandingFees,
+            'feeBreakdown' => $feeBreakdown,
 
             'scoreCount' => $scoreCount,
             'examCount' => $examCount,
+            'activeAssignments' => $activeAssignments,
+            'classesWithoutHomeroom' => $classesWithoutHomeroom,
+            'classesWithoutAssignments' => $classesWithoutAssignments,
+            'unassignedSchedules' => $unassignedSchedules,
         ]);
     }
 
@@ -355,6 +486,7 @@ class SchoolController extends Controller
                 $student->update(['avatar_path' => $validated['avatar']->store('avatars/students', 'public')]);
             }
             $this->syncEnrollment($student, $validated['academic_year_id'], $validated['class_id']);
+            $this->syncGuardians($student, $validated['guardians']);
             $this->createStudentAccount($student);
 
             return $student;
@@ -365,7 +497,10 @@ class SchoolController extends Controller
 
     public function editStudent(Student $student)
     {
-        $student->load(['enrollments' => fn($query) => $query->where('status', 'active')->latest('academic_year_id')]);
+        $student->load([
+            'enrollments' => fn($query) => $query->where('status', 'active')->latest('academic_year_id'),
+            'guardians',
+        ]);
 
         return view('admin.school.students.form', [
             'student' => $student,
@@ -386,6 +521,7 @@ class SchoolController extends Controller
                 $student->update(['avatar_path' => $validated['avatar']->store('avatars/students', 'public')]);
             }
             $this->syncEnrollment($student, $validated['academic_year_id'], $validated['class_id']);
+            $this->syncGuardians($student, $validated['guardians']);
         });
 
         return to_route('admin.school.students.index')->with('success', 'Đã cập nhật hồ sơ học sinh.');
@@ -430,6 +566,16 @@ class SchoolController extends Controller
             'transaction_code' => ['nullable', 'string', 'max:80'],
             'note' => ['nullable', 'string'],
         ]);
+        $notice = FeeNotice::findOrFail($data['fee_notice_id']);
+        $enrollment = $student->enrollments()
+            ->where('academic_year_id', $notice->academic_year_id)
+            ->where('status', 'active')
+            ->first();
+        if (! $enrollment || ($notice->class_id && (int) $notice->class_id !== (int) $enrollment->class_id)) {
+            throw ValidationException::withMessages([
+                'fee_notice_id' => 'Khoản thu không áp dụng cho năm học hoặc lớp hiện tại của học sinh.',
+            ]);
+        }
         if ($data['status'] === 'paid' && empty($data['paid_at'])) {
             $data['paid_at'] = now();
         }
@@ -501,6 +647,8 @@ class SchoolController extends Controller
         $search = trim((string) $request->input('q', ''));
         $status = trim((string) $request->input('status', ''));
         $type = trim((string) $request->input('type', ''));
+        $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
+        $classId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
         $teachers = Teacher::withCount(['homeroomClasses', 'assignments'])
             ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('teacher_code', 'like', "%{$search}%")
@@ -509,8 +657,25 @@ class SchoolController extends Controller
                     ->orWhere('specialization', 'like', "%{$search}%");
             }))
             ->when($status !== '', fn($query) => $query->where('status', $status))
-            ->when($type === 'homeroom', fn($query) => $query->whereHas('homeroomClasses'))
-            ->when($type === 'subject', fn($query) => $query->whereHas('assignments'))
+            ->when($yearId || $classId, function ($query) use ($yearId, $classId): void {
+                $query->where(function ($query) use ($yearId, $classId): void {
+                    $query->whereHas('assignments', function ($assignment) use ($yearId, $classId): void {
+                        $assignment->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+                            ->when($classId, fn($query) => $query->where('class_id', $classId));
+                    })->orWhereHas('homeroomClasses', function ($class) use ($yearId, $classId): void {
+                        $class->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+                            ->when($classId, fn($query) => $query->whereKey($classId));
+                    });
+                });
+            })
+            ->when($type === 'homeroom', fn($query) => $query->whereHas('homeroomClasses', function ($class) use ($yearId, $classId): void {
+                $class->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+                    ->when($classId, fn($query) => $query->whereKey($classId));
+            }))
+            ->when($type === 'subject', fn($query) => $query->whereHas('assignments', function ($assignment) use ($yearId, $classId): void {
+                $assignment->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
+                    ->when($classId, fn($query) => $query->where('class_id', $classId));
+            }))
             ->orderBy('full_name')
             ->paginate(15)
             ->withQueryString();
@@ -590,7 +755,9 @@ class SchoolController extends Controller
         $teacher = DB::transaction(function () use ($request, $teacherData): Teacher {
             $teacher = Teacher::create($teacherData);
             $this->storeTeacherAvatar($request, $teacher);
-            $this->syncTeacherProfile($request, $teacher);
+            if ($teacher->status === 'active') {
+                $this->syncTeacherProfile($request, $teacher);
+            }
             $this->createTeacherAccount($request, $teacher);
 
             return $teacher;
@@ -659,10 +826,15 @@ class SchoolController extends Controller
 
     public function updateTeacher(Request $request, Teacher $teacher)
     {
-        DB::transaction(function () use ($request, $teacher): void {
-            $teacher->update($this->teacherData($request, $teacher));
+        $teacherData = $this->teacherData($request, $teacher);
+        DB::transaction(function () use ($request, $teacher, $teacherData): void {
+            $teacher->update($teacherData);
             $this->storeTeacherAvatar($request, $teacher);
-            $this->syncTeacherProfile($request, $teacher);
+            if ($teacher->status === 'active') {
+                $this->syncTeacherProfile($request, $teacher);
+            } else {
+                $this->deactivateTeacherResponsibilities($teacher);
+            }
         });
 
         return to_route('admin.school.teachers.index')->with('success', 'Đã cập nhật hồ sơ giáo viên.');
@@ -1003,7 +1175,9 @@ class SchoolController extends Controller
             'semesters' => Semester::with('academicYear')->orderByDesc('id')->get(),
             'classes' => SchoolClass::with('grade', 'academicYear')->where('status', 'active')->orderByDesc('academic_year_id')->orderBy('name')->get(),
             'subjects' => Subject::where('is_active', true)->orderBy('name')->get(),
-            'teachers' => Teacher::where('status', 'active')->orderBy('full_name')->get(),
+            'teachers' => Teacher::where(function ($query) use ($assignment): void {
+                $query->where('status', 'active')->orWhereKey($assignment->teacher_id);
+            })->orderBy('full_name')->get(),
         ]);
     }
 
@@ -1015,14 +1189,16 @@ class SchoolController extends Controller
             'class_id' => ['required', 'exists:classes,id'],
             'subject_id' => ['required', 'exists:subjects,id'],
             'teacher_id' => ['required', 'exists:teachers,id'],
+            'status' => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
+        $data['status'] ??= 'active';
 
         if (! SchoolClass::whereKey($data['class_id'])->where('academic_year_id', $data['academic_year_id'])->exists()) {
             throw ValidationException::withMessages(['class_id' => 'Lớp không thuộc năm học đã chọn.']);
         }
 
         $teacher = Teacher::findOrFail($data['teacher_id']);
-        if ($teacher->status !== 'active') {
+        if ($data['status'] === 'active' && $teacher->status !== 'active') {
             throw ValidationException::withMessages(['teacher_id' => 'Chỉ giáo viên đang công tác mới được phân công giảng dạy.']);
         }
 
@@ -1030,7 +1206,7 @@ class SchoolController extends Controller
             throw ValidationException::withMessages(['semester_id' => 'Học kỳ không thuộc năm học đã chọn.']);
         }
 
-        if (TeachingAssignment::where($data)->exists()) {
+        if (TeachingAssignment::where(collect($data)->except('status')->all())->exists()) {
             throw ValidationException::withMessages(['teacher_id' => 'Phân công này đã tồn tại.']);
         }
 
@@ -1056,6 +1232,7 @@ class SchoolController extends Controller
             'class_id' => ['required', 'exists:classes,id'],
             'subject_id' => ['required', 'exists:subjects,id'],
             'teacher_id' => ['required', 'exists:teachers,id'],
+            'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
 
         if (! SchoolClass::whereKey($data['class_id'])->where('academic_year_id', $data['academic_year_id'])->exists()) {
@@ -1065,10 +1242,10 @@ class SchoolController extends Controller
             throw ValidationException::withMessages(['semester_id' => 'Học kỳ không thuộc năm học đã chọn.']);
         }
         $teacher = Teacher::findOrFail($data['teacher_id']);
-        if ($teacher->status !== 'active') {
+        if ($data['status'] === 'active' && $teacher->status !== 'active') {
             throw ValidationException::withMessages(['teacher_id' => 'Chỉ giáo viên đang công tác mới được phân công giảng dạy.']);
         }
-        $duplicate = TeachingAssignment::where($data)->whereKeyNot($assignment->id)->exists();
+        $duplicate = TeachingAssignment::where(collect($data)->except('status')->all())->whereKeyNot($assignment->id)->exists();
         if ($duplicate) {
             throw ValidationException::withMessages(['teacher_id' => 'Phân công này đã tồn tại.']);
         }
@@ -1583,7 +1760,7 @@ class SchoolController extends Controller
         $audience = trim((string) $request->input('audience', ''));
         $type = trim((string) $request->input('type', ''));
         $published = $request->input('published', '');
-        $announcements = Announcement::when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+        $announcements = Announcement::with('class')->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
             $query->where('title', 'like', "%{$search}%")
                 ->orWhere('content', 'like', "%{$search}%")
                 ->orWhere('type', 'like', "%{$search}%")
@@ -1603,12 +1780,12 @@ class SchoolController extends Controller
 
     public function createAnnouncement()
     {
-        return view('admin.school.announcements.form', ['announcement' => null]);
+        return view('admin.school.announcements.form', $this->announcementFormData());
     }
 
     public function editAnnouncement(Announcement $announcement)
     {
-        return view('admin.school.announcements.form', compact('announcement'));
+        return view('admin.school.announcements.form', $this->announcementFormData($announcement));
     }
 
     public function storeAnnouncement(Request $request)
@@ -1797,11 +1974,24 @@ class SchoolController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'content' => ['required', 'string'],
             'type' => ['required', 'string', 'max:30'],
-            'audience' => ['required', 'string', 'max:30'],
+            'audience' => ['required', Rule::in(['all', 'students', 'teachers'])],
+            'class_id' => ['nullable', 'exists:classes,id'],
             'published_at' => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date'],
             'is_published' => ['nullable', 'boolean'],
         ]) + ['is_published' => $request->boolean('is_published')];
+    }
+
+    private function announcementFormData(?Announcement $announcement = null): array
+    {
+        return [
+            'announcement' => $announcement,
+            'classes' => SchoolClass::with('academicYear', 'grade')
+                ->where('status', 'active')
+                ->orderByDesc('academic_year_id')
+                ->orderBy('name')
+                ->get(),
+        ];
     }
 
     private function feeFormData(?FeeNotice $fee = null): array
@@ -1961,7 +2151,6 @@ class SchoolController extends Controller
         }
 
         $data = $request->validate([
-            'student_code' => ['required', 'string', 'max:30', $student ? Rule::unique('students', 'student_code')->ignore($student) : 'unique:students,student_code'],
             'full_name' => ['required', 'string', 'max:255'],
             'email' => $emailRules,
             'phone' => ['nullable', 'string', 'max:30'],
@@ -1975,6 +2164,16 @@ class SchoolController extends Controller
             'avatar' => ['nullable', 'image', 'max:2048'],
             'academic_year_id' => ['nullable', 'exists:academic_years,id'],
             'class_id' => ['nullable', 'exists:classes,id'],
+            'guardians' => ['nullable', 'array'],
+            'guardians.*.full_name' => ['nullable', 'string', 'max:255'],
+            'guardians.*.date_of_birth' => ['nullable', 'date'],
+            'guardians.*.phone' => ['nullable', 'string', 'max:30'],
+            'guardians.*.email' => ['nullable', 'email', 'max:255'],
+            'guardians.*.occupation' => ['nullable', 'string', 'max:255'],
+            'guardians.*.religion' => ['nullable', 'string', 'max:100'],
+            'guardians.*.workplace' => ['nullable', 'string', 'max:255'],
+            'guardians.*.address' => ['nullable', 'string', 'max:255'],
+            'guardians.*.notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         if ($data['status'] !== 'studying') {
@@ -1984,10 +2183,11 @@ class SchoolController extends Controller
 
         $enrollment = ['academic_year_id' => $data['academic_year_id'] ?? null, 'class_id' => $data['class_id'] ?? null];
         $avatar = $data['avatar'] ?? null;
+        $guardians = $data['guardians'] ?? [];
         unset($data['avatar']);
-        unset($data['academic_year_id'], $data['class_id']);
+        unset($data['academic_year_id'], $data['class_id'], $data['guardians']);
 
-        return ['student' => $data, 'avatar' => $avatar, ...$enrollment];
+        return ['student' => $data, 'avatar' => $avatar, 'guardians' => $guardians, ...$enrollment];
     }
 
     private function syncEnrollment(Student $student, ?int $yearId, ?int $classId): void
@@ -2035,7 +2235,6 @@ class SchoolController extends Controller
         }
 
         $data = $request->validate([
-            'teacher_code' => ['required', 'string', 'max:30', $teacher ? Rule::unique('teachers', 'teacher_code')->ignore($teacher) : 'unique:teachers,teacher_code'],
             'full_name' => ['required', 'string', 'max:255'],
             'email' => $emailRules,
             'phone' => ['nullable', 'string', 'max:30'],
@@ -2129,6 +2328,67 @@ class SchoolController extends Controller
             SchoolClass::where('academic_year_id', $yearId)
                 ->whereIn('id', $homeroomClassIds)
                 ->update(['homeroom_teacher_id' => $teacher->id]);
+        }
+    }
+
+    private function deactivateTeacherResponsibilities(Teacher $teacher): void
+    {
+        $teacher->assignments()->where('status', 'active')->update(['status' => 'inactive']);
+        $teacher->homeroomClasses()->update(['homeroom_teacher_id' => null]);
+        $teacher->schedules()
+            ->whereDate('week_start', '>=', today()->startOfWeek())
+            ->update(['teacher_id' => null]);
+        $teacher->examInvigilations()
+            ->whereHas('exam', fn ($query) => $query->whereDate('exam_date', '>=', today()))
+            ->delete();
+    }
+
+    private function syncGuardians(Student $student, array $rows): void
+    {
+        $relationships = ['father', 'mother'];
+        $existing = $student->guardians()->get()->keyBy('pivot.relationship');
+        $primaryRelationship = filled(data_get($rows, 'father.full_name')) ? 'father' : 'mother';
+        $fields = [
+            'full_name', 'date_of_birth', 'phone', 'email', 'occupation',
+            'religion', 'workplace', 'address', 'notes',
+        ];
+
+        foreach ($relationships as $relationship) {
+            $payload = collect($rows[$relationship] ?? [])
+                ->only($fields)
+                ->map(fn ($value) => filled($value) ? $value : null)
+                ->all();
+            $guardian = $existing->get($relationship);
+            $hasData = collect($payload)->contains(fn ($value) => filled($value));
+
+            if (! $hasData) {
+                if ($guardian) {
+                    $student->guardians()->detach($guardian->id);
+                    if ($guardian->students()->doesntExist()) {
+                        $guardian->delete();
+                    }
+                }
+                continue;
+            }
+
+            if (blank($payload['full_name'] ?? null)) {
+                throw ValidationException::withMessages([
+                    "guardians.{$relationship}.full_name" => 'Vui lòng nhập họ tên phụ huynh khi có thông tin liên hệ.',
+                ]);
+            }
+
+            $guardian ??= new Guardian();
+            $guardian->fill($payload)->save();
+            $student->guardians()->syncWithoutDetaching([
+                $guardian->id => [
+                    'relationship' => $relationship,
+                    'is_primary' => $relationship === $primaryRelationship,
+                ],
+            ]);
+            $student->guardians()->updateExistingPivot($guardian->id, [
+                'relationship' => $relationship,
+                'is_primary' => $relationship === $primaryRelationship,
+            ]);
         }
     }
 

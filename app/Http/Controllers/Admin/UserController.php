@@ -18,17 +18,22 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
+        $roleId = $request->filled('role_id') ? (int) $request->input('role_id') : null;
         $users = User::with(['roles', 'teacherProfile', 'studentProfile'])
             ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhereHas('roles', fn ($role) => $role->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
             }))
+            ->when($roleId, fn ($query) => $query->whereHas('roles', fn ($role) => $role->whereKey($roleId)))
             ->orderBy('name')
             ->paginate(12)
             ->withQueryString();
 
-        return view('admin.users.index', compact('users'));
+        return view('admin.users.index', [
+            'users' => $users,
+            'roles' => Role::withCount('users')->orderBy('name')->get(),
+        ]);
     }
 
     public function create()
@@ -92,12 +97,16 @@ class UserController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $validated, $user): void {
+            $passwordChanged = ! empty($validated['password']);
             $user->update([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 ...($request->hasFile('avatar') ? ['avatar_path' => $this->replaceAvatar($request, $user->avatar_path)] : []),
                 ...(!empty($validated['password']) ? ['password' => Hash::make($validated['password']), 'must_change_password' => false] : []),
             ]);
+            if ($passwordChanged) {
+                $user->increment('jwt_version');
+            }
             $user->roles()->sync($validated['roles'] ?? []);
             $this->syncProfiles($user, $validated['teacher_id'] ?? null, $validated['student_id'] ?? null);
         });

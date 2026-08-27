@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Menu;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -55,13 +56,17 @@ class RbacAuthorizationTest extends TestCase
             ['slug' => 'roles.edit'],
             ['name' => 'Edit roles']
         );
+        $managePermission = Permission::firstOrCreate(
+            ['slug' => 'roles.manage'],
+            ['name' => 'Manage roles']
+        );
         $oldPermission = Permission::create([
             'name' => 'Old permission',
             'slug' => 'reports.manage',
         ]);
 
         $actorRole = Role::create(['name' => 'Actor', 'slug' => 'actor']);
-        $actorRole->permissions()->attach($editPermission);
+        $actorRole->permissions()->attach([$editPermission->id, $managePermission->id]);
         $actor = User::factory()->create();
         $actor->roles()->attach($actorRole);
 
@@ -80,6 +85,29 @@ class RbacAuthorizationTest extends TestCase
             'role_id' => $targetRole->id,
             'permission_id' => $oldPermission->id,
         ]);
+    }
+
+    public function test_revoking_manage_permission_blocks_direct_feature_urls_immediately(): void
+    {
+        $manage = Permission::firstOrCreate(['slug' => 'teachers.manage'], ['name' => 'Manage teachers']);
+        $create = Permission::firstOrCreate(['slug' => 'teachers.create'], ['name' => 'Create teachers']);
+        $edit = Permission::firstOrCreate(['slug' => 'teachers.edit'], ['name' => 'Edit teachers']);
+        $role = Role::create(['name' => 'School admin', 'slug' => 'school-admin']);
+        $role->permissions()->attach([$manage->id, $create->id, $edit->id]);
+        $user = User::factory()->create();
+        $user->roles()->attach($role);
+        $teacher = Teacher::create([
+            'full_name' => 'Test Teacher',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user)->get(route('admin.school.teachers.index'))->assertOk();
+
+        $role->permissions()->detach($manage);
+
+        $this->get(route('admin.school.teachers.index'))->assertForbidden();
+        $this->get(route('admin.school.teachers.create'))->assertForbidden();
+        $this->get(route('admin.school.teachers.edit', $teacher))->assertForbidden();
     }
 
     public function test_sidebar_shows_parent_when_only_a_child_menu_is_assigned(): void

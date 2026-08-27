@@ -15,6 +15,23 @@
         @endif
     </div>
 
+    <div class="card form-card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ route('admin.users.index') }}" class="row g-3 align-items-end">
+                <div class="col-md-5"><label class="form-label" for="user-role-filter">Vai trò</label><select
+                        id="user-role-filter" name="role_id" class="form-select">
+                        <option value="">Tất cả vai trò</option>
+                        @foreach($roles as $role)
+                            <option value="{{ $role->id }}" @selected(request('role_id') == $role->id)>{{ $role->name }} ({{ $role->users_count }})</option>
+                        @endforeach
+                    </select></div>
+                @if(request()->filled('q'))<input type="hidden" name="q" value="{{ request('q') }}">@endif
+                <div class="col-md-3"><button class="btn btn-primary w-100" type="submit"><i data-lucide="filter"></i> Lọc tài khoản</button></div>
+                <div class="col-md-2"><a class="btn btn-light w-100" href="{{ route('admin.users.index') }}"><i data-lucide="rotate-ccw"></i> Đặt lại</a></div>
+            </form>
+        </div>
+    </div>
+
     <div class="card table-card">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">

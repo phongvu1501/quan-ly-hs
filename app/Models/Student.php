@@ -19,6 +19,24 @@ class Student extends Model
         return ['date_of_birth' => 'date'];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (Student $student): void {
+            if (blank($student->student_code)) {
+                $student->student_code = static::generateCode();
+            }
+        });
+    }
+
+    private static function generateCode(): string
+    {
+        do {
+            $code = 'HS'.str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        } while (static::where('student_code', $code)->exists());
+
+        return $code;
+    }
+
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function enrollments(): HasMany { return $this->hasMany(Enrollment::class); }
     public function guardians(): BelongsToMany { return $this->belongsToMany(Guardian::class)->withPivot(['relationship', 'is_primary']); }

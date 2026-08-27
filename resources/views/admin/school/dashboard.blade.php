@@ -1,6 +1,6 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Dashboard tổng quan')
+@section('title', 'Tổng quan')
 
 @section('content')
     <style>
@@ -567,7 +567,8 @@
             gap: 8px;
         }
 
-        .db-quick a {
+        .db-quick a,
+        .db-quick button {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -580,10 +581,14 @@
             color: var(--db-ink);
             font-size: 9px;
             font-weight: 700;
+            font-family: inherit;
+            background: transparent;
+            cursor: pointer;
             transition: .18s;
         }
 
-        .db-quick a:hover {
+        .db-quick a:hover,
+        .db-quick button:hover {
             color: var(--db-primary);
             background: var(--db-soft);
             border-color: #cce6e6;
@@ -617,6 +622,82 @@
             margin-top: 3px;
             color: var(--db-ink);
             font-size: 20px;
+        }
+
+        .db-trend-chart {
+            height: 210px;
+            display: grid;
+            grid-template-columns: repeat(var(--trend-columns, 1), minmax(24px, 1fr));
+            align-items: end;
+            gap: 7px;
+            padding: 12px 4px 0;
+        }
+
+        .db-trend-col {
+            min-width: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        .db-trend-value {
+            min-height: 18px;
+            color: var(--db-ink);
+            font-size: 9px;
+            font-weight: 800;
+        }
+
+        .db-trend-stack {
+            width: min(100%, 34px);
+            min-height: 4px;
+            display: flex;
+            flex-direction: column-reverse;
+            overflow: hidden;
+            border-radius: 5px 5px 2px 2px;
+            background: #edf1f3;
+        }
+
+        .db-trend-segment {
+            display: block;
+            width: 100%;
+            min-height: 1px;
+        }
+
+        .db-trend-label {
+            margin-top: 7px;
+            color: var(--db-muted);
+            font-size: 8px;
+            white-space: nowrap;
+        }
+
+        .db-table-link {
+            color: var(--db-primary);
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .db-alert-count {
+            color: var(--db-danger);
+        }
+
+        .db-modal-table {
+            max-height: 430px;
+            overflow: auto;
+            border: 1px solid var(--db-line);
+            border-radius: 8px;
+        }
+
+        .db-modal-table .table {
+            min-width: 720px;
+        }
+
+        .db-modal-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #f8fafb;
         }
 
         @media (max-width: 1100px) {
@@ -673,7 +754,7 @@
         $latePercent = round(($late / $attendanceTotal) * 100, 1);
         $excusedPercent = round(($excused / $attendanceTotal) * 100, 1);
 
-        $ratingTotal = max(1, (int) $scoreRatings->sum());
+        $ratingTotal = (int) $scoreRatings->sum();
 
         $excellent = (int) ($scoreRatings['excellent'] ?? 0);
         $good = (int) ($scoreRatings['good'] ?? 0);
@@ -691,6 +772,7 @@
         $donutEnd1 = $presentPercent;
         $donutEnd2 = $donutEnd1 + $absentPercent;
         $donutEnd3 = $donutEnd2 + $latePercent;
+        $trendMax = max(1, (int) $attendanceTrend->max('total'));
     @endphp
 
     <div class="school-dashboard">
@@ -700,8 +782,8 @@
             <div>
                 <h1>Dashboard tổng quan</h1>
                 <p>
-                    {{ $year?->name ?: 'Chưa thiết lập năm học' }}
-                    · Theo dõi hoạt động và các chỉ số quan trọng của nhà trường.
+                    {{-- {{ $year?->name ?: 'Chưa thiết lập năm học' }} --}}
+                    Theo dõi hoạt động và các chỉ số quan trọng của nhà trường.
                 </p>
             </div>
 
@@ -810,7 +892,10 @@
                 <div class="db-kpi-label">Học sinh</div>
                 <div class="db-kpi-value">{{ number_format($students) }}</div>
                 <div class="db-kpi-note">Đang học theo bộ lọc</div>
-                <a class="db-kpi-link" href="{{ route('admin.school.students.index') }}">Xem danh sách →</a>
+                @if(auth()->user()->hasPermission('students.manage'))<a class="db-kpi-link"
+                    href="{{ route('admin.school.students.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
+                    data-modal-url="{{ route('admin.school.students.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
+                    data-modal-readonly="true" data-modal-title="Danh sách học sinh">Xem danh sách →</a>@endif
             </div>
 
             <div class="db-card db-kpi">
@@ -818,7 +903,9 @@
                 <div class="db-kpi-label">Giáo viên</div>
                 <div class="db-kpi-value">{{ number_format($teachers) }}</div>
                 <div class="db-kpi-note">Đang công tác</div>
-                <a class="db-kpi-link" href="{{ route('admin.school.teachers.index') }}">Xem danh sách →</a>
+                @if(auth()->user()->hasPermission('teachers.manage'))<a class="db-kpi-link" href="{{ route('admin.school.teachers.index', ['status' => 'active', 'academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
+                    data-modal-url="{{ route('admin.school.teachers.index', ['status' => 'active', 'academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
+                    data-modal-readonly="true" data-modal-title="Danh sách giáo viên">Xem danh sách →</a>@endif
             </div>
 
             <div class="db-card db-kpi">
@@ -826,7 +913,10 @@
                 <div class="db-kpi-label">Lớp học</div>
                 <div class="db-kpi-value">{{ number_format($classes) }}</div>
                 <div class="db-kpi-note">{{ $classes ? number_format($students / $classes, 1) : 0 }} học sinh/lớp</div>
-                <a class="db-kpi-link" href="{{ route('admin.school.classes.index') }}">Xem lớp học →</a>
+                @if(auth()->user()->hasPermission('classes.manage'))<a class="db-kpi-link"
+                    href="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"
+                    data-modal-url="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"
+                    data-modal-readonly="true" data-modal-title="Danh sách lớp học">Xem lớp học →</a>@endif
             </div>
 
             <div class="db-card db-kpi">
@@ -883,6 +973,45 @@
                 <span class="db-action-value">{{ number_format($scoreCount) }}</span>
             </button>
 
+        </div>
+
+        {{-- TÌNH TRẠNG VẬN HÀNH --}}
+        <div class="db-action-grid">
+            <button type="button" class="db-action-card" data-bs-toggle="modal" data-bs-target="#operationsModal">
+                <span class="db-action-icon"><i data-lucide="network"></i></span>
+                <span class="db-action-content">
+                    <span class="db-action-title">Phân công giảng dạy</span>
+                    <span class="db-action-desc">Đang có hiệu lực</span>
+                </span>
+                <span class="db-action-value">{{ number_format($activeAssignments) }}</span>
+            </button>
+
+            <button type="button" class="db-action-card" data-bs-toggle="modal" data-bs-target="#operationsModal">
+                <span class="db-action-icon {{ $classesWithoutHomeroom ? 'warning' : '' }}"><i data-lucide="user-round-minus"></i></span>
+                <span class="db-action-content">
+                    <span class="db-action-title">Lớp thiếu chủ nhiệm</span>
+                    <span class="db-action-desc">Cần bổ sung giáo viên phụ trách</span>
+                </span>
+                <span class="db-action-value {{ $classesWithoutHomeroom ? 'db-alert-count' : '' }}">{{ number_format($classesWithoutHomeroom) }}</span>
+            </button>
+
+            <button type="button" class="db-action-card" data-bs-toggle="modal" data-bs-target="#operationsModal">
+                <span class="db-action-icon {{ $classesWithoutAssignments ? 'warning' : '' }}"><i data-lucide="book-dashed"></i></span>
+                <span class="db-action-content">
+                    <span class="db-action-title">Lớp chưa phân công môn</span>
+                    <span class="db-action-desc">Không có phân công đang hoạt động</span>
+                </span>
+                <span class="db-action-value {{ $classesWithoutAssignments ? 'db-alert-count' : '' }}">{{ number_format($classesWithoutAssignments) }}</span>
+            </button>
+
+            <button type="button" class="db-action-card" data-bs-toggle="modal" data-bs-target="#operationsModal">
+                <span class="db-action-icon {{ $unassignedSchedules ? 'danger' : '' }}"><i data-lucide="calendar-x-2"></i></span>
+                <span class="db-action-content">
+                    <span class="db-action-title">Tiết chưa có giáo viên</span>
+                    <span class="db-action-desc">Từ tuần hiện tại trở đi</span>
+                </span>
+                <span class="db-action-value {{ $unassignedSchedules ? 'db-alert-count' : '' }}">{{ number_format($unassignedSchedules) }}</span>
+            </button>
         </div>
 
         {{-- BIỂU ĐỒ --}}
@@ -986,7 +1115,7 @@
                     </button>
                 </div>
 
-                @if ($ratingTotal > 1)
+                @if ($ratingTotal > 0)
                     @php
                         $scoreMax = max(1, $excellent, $good, $average, $weak);
                     @endphp
@@ -1081,6 +1210,71 @@
 
         </div>
 
+        {{-- XU HƯỚNG + VẬN HÀNH LỚP --}}
+        <div class="db-section-row">
+            <div class="db-card db-panel">
+                <div class="db-panel-head">
+                    <div>
+                        <h2 class="db-panel-title">Xu hướng chuyên cần</h2>
+                        <p class="db-panel-subtitle">14 ngày có dữ liệu gần nhất trong khoảng đã lọc.</p>
+                    </div>
+                    @if(auth()->user()->hasPermission('attendance.manage'))
+                        <a class="db-panel-action text-decoration-none" href="{{ route('admin.school.attendance.index', ['academic_year_id' => $filterAcademicYearId, 'date_from' => $filterDateFrom, 'date_to' => $filterDateTo, 'class_id' => $filterClassId]) }}">Mở điểm danh</a>
+                    @endif
+                </div>
+
+                @if($attendanceTrend->isNotEmpty())
+                    <div class="db-trend-chart" style="--trend-columns: {{ $attendanceTrend->count() }}">
+                        @foreach($attendanceTrend as $day)
+                            @php
+                                $chartHeight = max(4, round(($day['total'] / $trendMax) * 165));
+                                $dayTotal = max(1, $day['total']);
+                            @endphp
+                            <div class="db-trend-col" title="{{ Carbon\Carbon::parse($day['date'])->format('d/m/Y') }} · {{ $day['total'] }} lượt">
+                                <span class="db-trend-value">{{ $day['total'] }}</span>
+                                <span class="db-trend-stack" style="height: {{ $chartHeight }}px">
+                                    <span class="db-trend-segment" style="height: {{ ($day['present'] / $dayTotal) * 100 }}%;background:#25886a" title="Có mặt: {{ $day['present'] }}"></span>
+                                    <span class="db-trend-segment" style="height: {{ ($day['absent'] / $dayTotal) * 100 }}%;background:#c95d67" title="Vắng: {{ $day['absent'] }}"></span>
+                                    <span class="db-trend-segment" style="height: {{ ($day['late'] / $dayTotal) * 100 }}%;background:#d98b32" title="Đi muộn: {{ $day['late'] }}"></span>
+                                    <span class="db-trend-segment" style="height: {{ ($day['excused'] / $dayTotal) * 100 }}%;background:#7886a0" title="Có phép: {{ $day['excused'] }}"></span>
+                                </span>
+                                <span class="db-trend-label">{{ Carbon\Carbon::parse($day['date'])->format('d/m') }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="db-empty">Chưa có dữ liệu chuyên cần trong khoảng thời gian này.</div>
+                @endif
+            </div>
+
+            <div class="db-card db-panel">
+                <div class="db-panel-head">
+                    <div>
+                        <h2 class="db-panel-title">Tình trạng lớp học</h2>
+                        <p class="db-panel-subtitle">Sĩ số, chủ nhiệm và mức độ hoàn thiện phân công.</p>
+                    </div>
+                    <button type="button" class="db-panel-action" data-bs-toggle="modal" data-bs-target="#operationsModal">Chi tiết</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Lớp</th><th>Sĩ số</th><th>Chủ nhiệm</th><th>Phân công</th></tr></thead>
+                        <tbody>
+                            @forelse($classOverview->take(7) as $classItem)
+                                <tr>
+                                    <td><strong>{{ $classItem->name }}</strong><small class="d-block text-secondary">{{ $classItem->grade?->name }}</small></td>
+                                    <td>{{ number_format($classItem->active_students_count) }}</td>
+                                    <td>{{ $classItem->homeroomTeacher?->full_name ?: 'Chưa có' }}</td>
+                                    <td><span class="status-dot {{ $classItem->active_assignments_count ? 'status-on' : 'status-off' }}">{{ $classItem->active_assignments_count }} môn</span></td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="empty-state">Chưa có lớp phù hợp bộ lọc.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         {{-- THÔNG BÁO + LỊCH THI --}}
         <div class="row g-2 mb-2">
 
@@ -1092,6 +1286,9 @@
                             <h2 class="db-panel-title">Thông báo mới nhất</h2>
                             <p class="db-panel-subtitle">Các thông báo đã phát hành.</p>
                         </div>
+                        @if(auth()->user()->hasPermission('announcements.manage'))
+                            <a class="db-panel-action text-decoration-none" href="{{ route('admin.school.announcements.index') }}">Xem tất cả</a>
+                        @endif
                     </div>
 
                     @forelse($recentAnnouncements as $announcement)
@@ -1104,7 +1301,8 @@
                                 <div class="db-list-title">{{ $announcement->title }}</div>
                                 <div class="db-list-meta">
                                     {{ $announcement->published_at?->format('d/m/Y H:i') }}
-                                    · {{ $announcement->audience }}
+                                    · {{ ['all' => 'Toàn trường', 'students' => 'Học sinh', 'teachers' => 'Giáo viên'][$announcement->audience] ?? $announcement->audience }}
+                                    @if($announcement->class) · {{ $announcement->class->name }} @endif
                                 </div>
                             </div>
                         </div>
@@ -1143,6 +1341,8 @@
                                 <div class="db-list-meta">
                                     {{ $exam->subject?->name ?: 'Chưa xác định môn' }}
                                     · {{ $exam->class?->name ?: 'Toàn khối' }}
+                                    · {{ $exam->starts_at ?: 'Chưa chốt giờ' }}
+                                    @if($exam->room) · Phòng {{ $exam->room }} @endif
                                 </div>
                             </div>
 
@@ -1166,35 +1366,47 @@
             </div>
 
             <div class="db-quick">
+                @if(auth()->user()->hasPermission('students.manage'))
                 <a href="{{ route('admin.school.students.index') }}">
                     <i data-lucide="graduation-cap"></i>
                     Học sinh
                 </a>
+                @endif
 
+                @if(auth()->user()->hasPermission('teachers.manage'))
                 <a href="{{ route('admin.school.teachers.index') }}">
                     <i data-lucide="contact-round"></i>
                     Giáo viên
                 </a>
+                @endif
 
+                @if(auth()->user()->hasPermission('classes.manage'))
                 <a href="{{ route('admin.school.classes.index') }}">
                     <i data-lucide="school"></i>
                     Lớp học
                 </a>
+                @endif
 
+                @if(auth()->user()->hasPermission('subjects.manage'))
                 <a href="{{ route('admin.school.subjects.index') }}">
                     <i data-lucide="book-open"></i>
                     Môn học
                 </a>
+                @endif
 
-                <a href="#" data-bs-toggle="modal" data-bs-target="#absentModal">
+                @if(auth()->user()->hasPermission('attendance.manage'))
+                <button type="button" data-dashboard-modal="#absentModal">
                     <i data-lucide="calendar-check-2"></i>
                     Điểm danh
-                </a>
+                </button>
+                @endif
 
-                <a href="#" data-bs-toggle="modal" data-bs-target="#feeModal">
+                @if(auth()->user()->hasPermission('fees.manage'))
+                <button type="button" data-dashboard-modal="#feeModal">
                     <i data-lucide="wallet-cards"></i>
                     Học phí
-                </a>
+                </button>
+                @endif
             </div>
         </div>
 
@@ -1250,11 +1462,30 @@
                         </div>
                     </div>
 
-                    <div class="db-empty">
-                        Muốn xem đến từng học sinh cần mở danh sách điểm danh chi tiết.
+                    <div class="db-modal-table">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Ngày</th><th>Học sinh</th><th>Lớp</th><th>Môn/tiết</th><th>Trạng thái</th><th>Lý do</th></tr></thead>
+                            <tbody>
+                                @forelse($attendanceDetails as $record)
+                                    <tr>
+                                        <td>{{ $record->attended_on?->format('d/m/Y') }}</td>
+                                        <td><strong>{{ $record->student?->full_name }}</strong><small class="d-block text-secondary">{{ $record->student?->student_code }}</small></td>
+                                        <td>{{ $record->class?->name ?: '-' }}</td>
+                                        <td>{{ $record->subject?->name ?: 'Sinh hoạt lớp' }}@if($record->period)<small class="d-block text-secondary">Tiết {{ $record->period }}</small>@endif</td>
+                                        <td><span class="status-dot status-off">{{ ['absent' => 'Vắng', 'late' => 'Đi muộn', 'excused' => 'Có phép'][$record->status] ?? $record->status }}</span></td>
+                                        <td>{{ $record->reason ?: '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" class="empty-state">Không có lượt vắng, muộn hoặc nghỉ có phép.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
 
                 </div>
+                @if(auth()->user()->hasPermission('attendance.manage'))
+                    <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.attendance.index', ['academic_year_id' => $filterAcademicYearId, 'date_from' => $filterDateFrom, 'date_to' => $filterDateTo, 'class_id' => $filterClassId]) }}"><i data-lucide="external-link"></i> Mở quản lý điểm danh</a></div>
+                @endif
             </div>
         </div>
     </div>
@@ -1300,7 +1531,30 @@
                         </div>
                     </div>
 
+                    <div class="db-modal-table mt-3">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Khoản thu</th><th>Đối tượng</th><th>Phải thu</th><th>Đã thu</th><th>Còn lại</th><th>Hạn đóng</th></tr></thead>
+                            <tbody>
+                                @forelse($feeBreakdown as $row)
+                                    <tr>
+                                        <td><strong>{{ $row['notice']->title }}</strong><small class="d-block text-secondary">{{ $row['paid_students'] }}/{{ $row['student_count'] }} học sinh đã đóng</small></td>
+                                        <td>{{ $row['notice']->class?->name ?: 'Toàn trường' }}</td>
+                                        <td>{{ number_format($row['expected'], 0, ',', '.') }} đ</td>
+                                        <td class="text-success">{{ number_format($row['paid'], 0, ',', '.') }} đ</td>
+                                        <td class="{{ $row['outstanding'] > 0 ? 'text-danger' : 'text-success' }}">{{ number_format($row['outstanding'], 0, ',', '.') }} đ</td>
+                                        <td><span class="status-dot {{ $row['overdue'] ? 'status-off' : 'status-on' }}">{{ $row['notice']->due_on?->format('d/m/Y') ?: 'Chưa chốt' }}</span></td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" class="empty-state">Chưa có khoản thu đang hoạt động.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
                 </div>
+                @if(auth()->user()->hasPermission('fees.manage'))
+                    <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.fees.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"><i data-lucide="external-link"></i> Mở quản lý học phí</a></div>
+                @endif
             </div>
         </div>
     </div>
@@ -1336,6 +1590,8 @@
                                 <div class="db-list-meta">
                                     {{ $exam->subject?->name ?: 'Chưa xác định môn' }}
                                     · {{ $exam->class?->name ?: 'Toàn khối' }}
+                                    · {{ $exam->starts_at ?: 'Chưa chốt giờ' }}
+                                    @if($exam->room) · Phòng {{ $exam->room }} @endif
                                 </div>
                             </div>
 
@@ -1349,6 +1605,9 @@
                     @endforelse
 
                 </div>
+                @if(auth()->user()->hasPermission('exams.manage'))
+                    <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.exams.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId, 'date_from' => $filterDateFrom, 'date_to' => $filterDateTo]) }}"><i data-lucide="external-link"></i> Mở quản lý lịch thi</a></div>
+                @endif
             </div>
         </div>
     </div>
@@ -1403,11 +1662,32 @@
 
                     </div>
 
-                    <div class="mt-3 db-empty">
-                        Tổng hợp điểm đang dùng dữ liệu SubjectResult theo năm học hiện tại.
+                    <div class="db-modal-table mt-3">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Học sinh</th><th>Số điểm</th><th>Điểm trung bình</th><th>Xếp loại tạm tính</th></tr></thead>
+                            <tbody>
+                                @forelse($scoreAverageDetails as $scoreStudent)
+                                    @php
+                                        $studentAverage = (float) $scoreStudent->average_score;
+                                        $studentRating = $studentAverage >= 8 ? 'Tốt' : ($studentAverage >= 6.5 ? 'Khá' : ($studentAverage >= 5 ? 'Đạt' : 'Cần cố gắng'));
+                                    @endphp
+                                    <tr>
+                                        <td><strong>{{ $scoreStudent->full_name }}</strong><small class="d-block text-secondary">{{ $scoreStudent->student_code }}</small></td>
+                                        <td>{{ number_format($scoreStudent->score_count) }}</td>
+                                        <td><strong>{{ number_format($studentAverage, 2) }}</strong></td>
+                                        <td><span class="status-dot {{ $studentAverage >= 5 ? 'status-on' : 'status-off' }}">{{ $studentRating }}</span></td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="4" class="empty-state">Chưa có điểm trong phạm vi đã lọc.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                     </div>
 
                 </div>
+                @if(auth()->user()->hasPermission('scores.manage'))
+                    <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.scores.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId, 'grade_id' => $filterGradeId]) }}"><i data-lucide="external-link"></i> Mở quản lý điểm</a></div>
+                @endif
             </div>
         </div>
     </div>
@@ -1443,6 +1723,81 @@
                         @endforelse
                     </div>
 
+                    <div class="db-modal-table mt-3">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Lớp</th><th>Khối</th><th>Sĩ số</th><th>Giáo viên chủ nhiệm</th><th>Môn phân công</th><th>Tiết đã xếp</th></tr></thead>
+                            <tbody>
+                                @forelse($classOverview as $classItem)
+                                    <tr>
+                                        <td><strong>{{ $classItem->name }}</strong></td>
+                                        <td>{{ $classItem->grade?->name }}</td>
+                                        <td>{{ number_format($classItem->active_students_count) }}</td>
+                                        <td>{{ $classItem->homeroomTeacher?->full_name ?: 'Chưa có' }}</td>
+                                        <td>{{ number_format($classItem->active_assignments_count) }}</td>
+                                        <td>{{ number_format($classItem->scheduled_periods_count) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" class="empty-state">Chưa có lớp phù hợp bộ lọc.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+                @if(auth()->user()->hasPermission('classes.manage'))
+                    <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"><i data-lucide="external-link"></i> Mở quản lý lớp</a></div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+
+    {{-- =========================================================
+    MODAL VẬN HÀNH LỚP
+========================================================= --}}
+    <div class="modal fade" id="operationsModal" tabindex="-1" aria-labelledby="operationsModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="operationsModalTitle">Tình trạng vận hành lớp học</h5>
+                        <small class="text-secondary">{{ $year?->name }} · {{ number_format($classOverview->count()) }} lớp</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-lg-3"><div class="db-modal-stat"><label>Phân công đang dạy</label><strong>{{ number_format($activeAssignments) }}</strong></div></div>
+                        <div class="col-6 col-lg-3"><div class="db-modal-stat"><label>Thiếu chủ nhiệm</label><strong>{{ number_format($classesWithoutHomeroom) }}</strong></div></div>
+                        <div class="col-6 col-lg-3"><div class="db-modal-stat"><label>Chưa phân công môn</label><strong>{{ number_format($classesWithoutAssignments) }}</strong></div></div>
+                        <div class="col-6 col-lg-3"><div class="db-modal-stat"><label>Tiết chưa có giáo viên</label><strong>{{ number_format($unassignedSchedules) }}</strong></div></div>
+                    </div>
+
+                    <div class="db-modal-table">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Lớp</th><th>Sĩ số</th><th>Chủ nhiệm</th><th>Phân công môn</th><th>Tiết đã xếp</th><th>Tình trạng</th></tr></thead>
+                            <tbody>
+                                @forelse($classOverview as $classItem)
+                                    @php($classNeedsAttention = !$classItem->homeroom_teacher_id || !$classItem->active_assignments_count)
+                                    <tr>
+                                        <td><strong>{{ $classItem->name }}</strong><small class="d-block text-secondary">{{ $classItem->grade?->name }}</small></td>
+                                        <td>{{ number_format($classItem->active_students_count) }}</td>
+                                        <td>{{ $classItem->homeroomTeacher?->full_name ?: 'Chưa phân công' }}</td>
+                                        <td>{{ number_format($classItem->active_assignments_count) }}</td>
+                                        <td>{{ number_format($classItem->scheduled_periods_count) }}</td>
+                                        <td><span class="status-dot {{ $classNeedsAttention ? 'status-off' : 'status-on' }}">{{ $classNeedsAttention ? 'Cần bổ sung' : 'Đã thiết lập' }}</span></td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" class="empty-state">Chưa có lớp phù hợp bộ lọc.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer d-flex flex-wrap gap-2">
+                    @if(auth()->user()->hasPermission('assignments.manage'))<a class="btn btn-light" href="{{ route('admin.school.assignments.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"><i data-lucide="network"></i> Phân công</a>@endif
+                    @if(auth()->user()->hasPermission('schedules.manage'))<a class="btn btn-light" href="{{ route('admin.school.schedules.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"><i data-lucide="calendar-days"></i> Thời khóa biểu</a>@endif
+                    @if(auth()->user()->hasPermission('classes.manage'))<a class="btn btn-primary" href="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"><i data-lucide="school"></i> Quản lý lớp</a>@endif
                 </div>
             </div>
         </div>
@@ -1454,6 +1809,30 @@
             function initDashboard() {
                 const gradeFilter = document.getElementById('dashboardGradeFilter');
                 const classFilter = document.getElementById('dashboardClassFilter');
+
+                document.querySelectorAll('[data-bs-toggle="modal"][data-bs-target^="#"]').forEach(function(trigger) {
+                    trigger.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        const modal = document.querySelector(trigger.getAttribute('data-bs-target'));
+                        if (modal && window.bootstrap?.Modal) {
+                            window.bootstrap.Modal.getOrCreateInstance(modal).show();
+                        }
+                    });
+                });
+
+                document.querySelectorAll('[data-dashboard-modal]').forEach(function(trigger) {
+                    trigger.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        const modal = document.querySelector(trigger.dataset.dashboardModal);
+                        if (modal && window.bootstrap?.Modal) {
+                            window.bootstrap.Modal.getOrCreateInstance(modal).show();
+                        }
+                    });
+                });
 
                 if (!gradeFilter || !classFilter) return;
 

@@ -1403,8 +1403,10 @@
                                 @class(['active' => request()->get('section') === 'announcements'])><i data-lucide="megaphone"></i><span>Thông báo</span></a>
                             <a href="{{ route('student.dashboard', ['section' => 'exams']) }}#exams"
                                 @class(['active' => request()->get('section') === 'exams'])><i data-lucide="file-clock"></i><span>Lịch thi</span></a>
-                            <a href="{{ route('student.payments') }}" @class(['active' => request()->routeIs('student.payments')])><i
-                                    data-lucide="wallet-cards"></i><span>Học phí</span></a>
+                            @if(auth()->user()->hasPermission('fees.view'))
+                                <a href="{{ route('student.payments') }}" @class(['active' => request()->routeIs('student.payments')])><i
+                                        data-lucide="wallet-cards"></i><span>Học phí</span></a>
+                            @endif
                         </div>
                     </details>
                 @endif

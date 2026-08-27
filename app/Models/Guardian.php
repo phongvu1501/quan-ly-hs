@@ -7,7 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Guardian extends Model
 {
-    protected $fillable = ['full_name', 'phone', 'email', 'address', 'occupation'];
+    protected $fillable = [
+        'full_name', 'date_of_birth', 'phone', 'email', 'address', 'occupation',
+        'religion', 'workplace', 'notes',
+    ];
+
+    protected function casts(): array
+    {
+        return ['date_of_birth' => 'date'];
+    }
 
     public function students(): BelongsToMany { return $this->belongsToMany(Student::class)->withPivot(['relationship', 'is_primary']); }
 }

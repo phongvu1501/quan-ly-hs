@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\JwtService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly JwtService $jwt) {}
+
     public function showRegister()
     {
         return view('auth.register');
@@ -45,14 +48,21 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        $user = User::where('email', $credentials['email'])->first();
+
+        if ($user && Hash::check($credentials['password'], $user->password)) {
+            $remember = $request->boolean('remember');
+            $token = $this->jwt->issue($user, $remember);
+            Auth::guard('web')->setUser($user);
             $request->session()->regenerate();
 
-            if (Auth::user()->must_change_password) {
-                return redirect()->route('profile.show')->with('warning', 'Bạn phải đổi mật khẩu mặc định trước khi sử dụng hệ thống.');
+            if ($user->must_change_password) {
+                $response = redirect()->route('profile.show')->with('warning', 'Bạn phải đổi mật khẩu mặc định trước khi sử dụng hệ thống.');
+            } else {
+                $response = redirect()->to($this->dashboardUrl($user));
             }
 
-            return redirect()->to($this->dashboardUrl(Auth::user()));
+            return $response->withCookie($this->jwtCookie($token, $remember));
         }
 
         return back()
@@ -64,12 +74,14 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        Auth::logout();
+        $request->user()?->increment('jwt_version');
+        Auth::guard('web')->forgetUser();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        return redirect()->route('login')
+            ->withCookie(cookie()->forget($this->jwt->cookieName()));
     }
 
     public function dashboardUrl(?User $user = null): string
@@ -101,5 +113,20 @@ class AuthController extends Controller
         }
 
         return route('dashboard');
+    }
+
+    private function jwtCookie(string $token, bool $remember)
+    {
+        return cookie(
+            $this->jwt->cookieName(),
+            $token,
+            $this->jwt->ttl($remember),
+            '/',
+            config('session.domain'),
+            (bool) config('session.secure'),
+            true,
+            false,
+            config('session.same_site', 'lax')
+        );
     }
 }

@@ -97,6 +97,7 @@
                                 <th>Môn học</th>
                                 <th>Giáo viên</th>
                                 <th>Học kỳ</th>
+                                <th>Trạng thái</th>
                                 <th class="text-end">Thao tác</th>
                             </tr>
                         </thead>
@@ -109,6 +110,7 @@
                                     <td>{{ $assignment->subject?->name }}</td>
                                     <td>{{ $assignment->teacher?->full_name }}</td>
                                     <td>{{ $assignment->semester?->name ?: 'Cả năm' }}</td>
+                                    <td><span class="status-dot {{ $assignment->status === 'active' ? 'status-on' : 'status-off' }}">{{ $assignment->status === 'active' ? 'Đang dạy' : 'Đã kết thúc' }}</span></td>
                                     <td class="text-end">
                                         <a href="{{ route('admin.school.assignments.edit', $assignment) }}" class="btn btn-sm btn-light" title="Sửa phân công"><i data-lucide="pencil"></i><span class="visually-hidden">Sửa</span></a>
                                         <form action="{{ route('admin.school.assignments.destroy', $assignment) }}"
@@ -118,7 +120,7 @@
                                                     data-lucide="trash-2"></i></button></form>
                                     </td>
                             </tr>@empty<tr>
-                                    <td colspan="5" class="empty-state">Chưa có phân công.</td>
+                                    <td colspan="6" class="empty-state">Chưa có phân công.</td>
                                 </tr>
                             @endforelse
                         </tbody>

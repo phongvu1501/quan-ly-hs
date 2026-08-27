@@ -83,7 +83,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/student/dashboard', [StudentPortalController::class, 'dashboard'])
         ->name('student.dashboard')->middleware('permission:student.dashboard');
     Route::get('/student/payments', [StudentPortalController::class, 'payments'])
-        ->name('student.payments')->middleware('permission:student.dashboard');
+        ->name('student.payments')->middleware('permission:fees.view');
+    Route::post('/teacher/notifications/{notification}/read', [TeacherPortalController::class, 'markNotificationRead'])
+        ->name('teacher.notifications.read')->middleware('permission:teacher.dashboard');
 });
 
 Route::middleware('auth')
