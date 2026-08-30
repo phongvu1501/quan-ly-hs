@@ -2,6 +2,11 @@
 
 @section('title', 'Nhận xét học sinh')
 
+@php
+    $canCreateComments = auth()->user()->hasPermission('scores.create');
+    $canEditComments = auth()->user()->hasPermission('scores.edit');
+@endphp
+
 @section('content')
     <div class="page-heading page-heading-inline">
         <div>
@@ -63,11 +68,13 @@
                 </div>
                 <span class="badge text-bg-light">{{ $students->count() }} học sinh</span>
             </div>
-            <form action="{{ route('teacher.comments.store') }}" method="POST" id="comments-form">
-                @csrf
-                <input type="hidden" name="class_id" value="{{ $class->id }}">
-                <input type="hidden" name="subject_id" value="{{ $subjectId }}">
-                <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+            @if ($canCreateComments)
+                <form action="{{ route('teacher.comments.store') }}" method="POST" id="comments-form">
+                    @csrf
+                    <input type="hidden" name="class_id" value="{{ $class->id }}">
+                    <input type="hidden" name="subject_id" value="{{ $subjectId }}">
+                    <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+            @endif
                 <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead>
@@ -98,12 +105,15 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <input type="hidden" name="comments[{{ $enrollment->student_id }}][comment_id]" value="{{ $comment?->id }}">
-                                    <textarea name="comments[{{ $enrollment->student_id }}][content]" class="form-control" rows="2" maxlength="3000"
-                                        placeholder="Nhập nhận xét cho {{ $student?->full_name }}">{{ old('comments.' . $enrollment->student_id . '.content', $comment?->content) }}</textarea>
+                                    @if ($canCreateComments)
+                                        <textarea name="comments[{{ $enrollment->student_id }}][content]" class="form-control" rows="2" maxlength="3000"
+                                            placeholder="Nhập nhận xét mới cho {{ $student?->full_name }}">{{ old('comments.' . $enrollment->student_id . '.content') }}</textarea>
+                                    @else
+                                        <span class="text-secondary">Không có quyền thêm nhận xét.</span>
+                                    @endif
                                 </td>
                                 <td class="text-end">
-                                    @if ($comment)
+                                    @if ($comment && $canEditComments)
                                         <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal"
                                             data-bs-target="#commentEditModal" data-comment-id="{{ $comment->id }}"
                                             data-comment-content="{{ $comment->content }}" title="Sửa nhận xét">
@@ -120,12 +130,15 @@
                     </tbody>
                 </table>
                 </div>
-                <div class="p-3 border-top d-flex justify-content-end"><button class="btn btn-primary" type="submit"><i
-                            data-lucide="save"></i> Lưu toàn bộ nhận xét</button></div>
-            </form>
+                @if ($canCreateComments)
+                    <div class="p-3 border-top d-flex justify-content-end"><button class="btn btn-primary" type="submit"><i
+                                data-lucide="save"></i> Lưu toàn bộ nhận xét</button></div>
+                    </form>
+                @endif
         </div>
 
-        <div class="modal fade" id="commentEditModal" tabindex="-1" aria-labelledby="commentEditTitle" aria-hidden="true">
+        @if ($canEditComments)
+            <div class="modal fade" id="commentEditModal" tabindex="-1" aria-labelledby="commentEditTitle" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -146,7 +159,8 @@
                     </form>
                 </div>
             </div>
-        </div>
+            </div>
+        @endif
     @else
         <div class="card">
             <div class="empty-state">Chưa có lớp hoặc học kỳ để nhập nhận xét.</div>

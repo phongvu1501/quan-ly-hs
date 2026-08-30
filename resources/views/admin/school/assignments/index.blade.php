@@ -10,10 +10,8 @@
             <p class="text-secondary mb-0">Gắn giáo viên với môn học, lớp và học kỳ để nhập điểm, điểm danh và nhận xét.</p>
         </div>
     </div>
-    @if ($classes->isEmpty() || $teachers->isEmpty())
-        <div class="alert alert-warning">Cần có ít nhất một lớp và một giáo viên trước khi phân công. <a
-                href="{{ route('admin.school.teachers.create') }}" data-modal-title="Thêm giáo viên">Thêm giáo viên</a> hoặc
-            <a href="{{ route('admin.school.classes.create') }}" data-modal-title="Thêm lớp học">thêm lớp học</a>.</div>
+    @if (($classes->isEmpty() || $teachers->isEmpty()) && auth()->user()->hasPermission('assignments.create'))
+        <div class="alert alert-warning">Cần có ít nhất một lớp và một giáo viên trước khi phân công.</div>
     @endif
     <div class="card filter-card mb-4"><div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-3 mb-3"><div><strong>Bộ lọc phân công</strong><small class="d-block text-secondary">Chọn năm học, học kỳ, lớp, môn hoặc giáo viên.</small></div><a class="btn btn-sm btn-light" href="{{ route('admin.school.assignments.index') }}" title="Đặt lại bộ lọc"><i data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a></div>
@@ -28,7 +26,8 @@
         </form>
     </div></div>
     <div class="row g-4">
-        <div class="col-xl-4">
+        @if (auth()->user()->hasPermission('assignments.create'))
+            <div class="col-xl-4">
             <div class="card form-card">
                 <div class="card-body">
                     <div class="section-label">Thêm phân công</div>
@@ -86,8 +85,9 @@
                     </form>
                 </div>
             </div>
-        </div>
-        <div class="col-xl-8">
+            </div>
+        @endif
+        <div class="{{ auth()->user()->hasPermission('assignments.create') ? 'col-xl-8' : 'col-12' }}">
             <div class="card table-card">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
@@ -112,12 +112,16 @@
                                     <td>{{ $assignment->semester?->name ?: 'Cả năm' }}</td>
                                     <td><span class="status-dot {{ $assignment->status === 'active' ? 'status-on' : 'status-off' }}">{{ $assignment->status === 'active' ? 'Đang dạy' : 'Đã kết thúc' }}</span></td>
                                     <td class="text-end">
-                                        <a href="{{ route('admin.school.assignments.edit', $assignment) }}" class="btn btn-sm btn-light" title="Sửa phân công"><i data-lucide="pencil"></i><span class="visually-hidden">Sửa</span></a>
-                                        <form action="{{ route('admin.school.assignments.destroy', $assignment) }}"
-                                            method="POST" data-modal-title="Xóa phân công"
-                                            data-confirm="Xóa phân công này?">@csrf @method('DELETE')<button
-                                                class="btn btn-sm btn-outline-danger" title="Xóa"><i
-                                                    data-lucide="trash-2"></i></button></form>
+                                        @if (auth()->user()->hasPermission('assignments.edit'))
+                                            <a href="{{ route('admin.school.assignments.edit', $assignment) }}" class="btn btn-sm btn-light" title="Sửa phân công"><i data-lucide="pencil"></i><span class="visually-hidden">Sửa</span></a>
+                                        @endif
+                                        @if (auth()->user()->hasPermission('assignments.delete'))
+                                            <form action="{{ route('admin.school.assignments.destroy', $assignment) }}"
+                                                method="POST" data-modal-title="Xóa phân công"
+                                                data-confirm="Nếu đã có lịch sử, phân công sẽ được kết thúc thay vì xóa. Tiếp tục?">@csrf @method('DELETE')<button
+                                                    class="btn btn-sm btn-outline-danger" title="Xóa hoặc kết thúc"><i
+                                                        data-lucide="archive"></i></button></form>
+                                        @endif
                                     </td>
                             </tr>@empty<tr>
                                     <td colspan="6" class="empty-state">Chưa có phân công.</td>

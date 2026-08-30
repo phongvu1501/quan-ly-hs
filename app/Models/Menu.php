@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
+use App\Services\PermissionResolver;
 
 class Menu extends Model
 {
@@ -48,13 +49,34 @@ class Menu extends Model
     {
         $roleVisible = $this->roles->pluck('id')->intersect($roleIds)->isNotEmpty();
 
-        // A menu assignment never bypasses the permission explicitly required
-        // by that path. This keeps the sidebar and direct URL access consistent.
         if ($this->required_permission) {
-            return $permissionSlugs->contains($this->required_permission);
+            return app(PermissionResolver::class)->slugsGrant($permissionSlugs, $this->required_permission);
         }
 
         return $roleVisible;
+    }
+
+    public function permissionForAction(string $action): ?string
+    {
+        if (blank($this->required_permission) || $action === 'view') {
+            return $this->required_permission;
+        }
+
+        [$resource, $requiredAction] = array_pad(
+            explode('.', $this->required_permission, 2),
+            2,
+            null
+        );
+
+        if (
+            $resource === ''
+            || ! in_array($requiredAction, ['view', 'create', 'edit', 'delete', 'manage'], true)
+            || $requiredAction === 'manage'
+        ) {
+            return $this->required_permission;
+        }
+
+        return "{$resource}.{$action}";
     }
 
     public function url(): string

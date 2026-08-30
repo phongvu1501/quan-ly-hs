@@ -17,4 +17,8 @@ class AcademicYear extends Model
     public function semesters(): HasMany { return $this->hasMany(Semester::class); }
     public function classes(): HasMany { return $this->hasMany(SchoolClass::class); }
     public function enrollments(): HasMany { return $this->hasMany(Enrollment::class); }
+    public function feeRates(): HasMany { return $this->hasMany(FeeRate::class); }
+    public function feePolicies(): HasMany { return $this->hasMany(FeePolicy::class); }
+    public function feeAssessments(): HasMany { return $this->hasMany(FeeAssessment::class); }
+    public function payrolls(): HasMany { return $this->hasMany(Payroll::class); }
 }

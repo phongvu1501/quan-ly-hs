@@ -17,12 +17,13 @@
     <div class="card filter-card mb-4">
         <div class="card-body">
             <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-                <div><strong>Bộ lọc học sinh</strong><small class="d-block text-secondary">Lọc theo năm học, lớp và trạng thái hồ sơ.</small></div>
+                <div><strong>Bộ lọc học sinh</strong><small class="d-block text-secondary">Lọc theo năm tuyển sinh, năm học, lớp và trạng thái hồ sơ.</small></div>
                 <a class="btn btn-sm btn-light" href="{{ route('admin.school.students.index') }}" title="Đặt lại bộ lọc"><i data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a>
             </div>
             <form method="GET" class="row g-3">
                 @if (request('q')) <input type="hidden" name="q" value="{{ request('q') }}"> @endif
-                <div class="col-md-4 col-xl-3"><label class="form-label" for="student-year">Năm học</label><select id="student-year" name="academic_year_id" class="form-select"><option value="">Tất cả năm học</option>@foreach($years as $year)<option value="{{ $year->id }}" @selected(request('academic_year_id') == $year->id)>{{ $year->name }}</option>@endforeach</select></div>
+                <div class="col-md-4 col-xl-2"><label class="form-label" for="student-admission-year">Năm tuyển sinh</label><select id="student-admission-year" name="admission_year" class="form-select"><option value="">Tất cả</option>@foreach($admissionYears as $value)<option value="{{ $value }}" @selected(request('admission_year') === $value)>{{ $value }}</option>@endforeach</select></div>
+                <div class="col-md-4 col-xl-2"><label class="form-label" for="student-year">Năm học</label><select id="student-year" name="academic_year_id" class="form-select"><option value="">Tất cả năm học</option>@foreach($years as $year)<option value="{{ $year->id }}" @selected(request('academic_year_id') == $year->id)>{{ $year->name }}</option>@endforeach</select></div>
                 <div class="col-md-4 col-xl-3"><label class="form-label" for="student-class">Lớp</label><select id="student-class" name="class_id" class="form-select"><option value="">Tất cả lớp</option>@foreach($classes as $class)<option value="{{ $class->id }}" data-year="{{ $class->academic_year_id }}" @selected(request('class_id') == $class->id)>{{ $class->name }} · {{ $class->academicYear?->name }}</option>@endforeach</select></div>
                 <div class="col-md-4 col-xl-3"><label class="form-label" for="student-status">Trạng thái</label><select id="student-status" name="status" class="form-select"><option value="">Tất cả trạng thái</option>@foreach($studentStatuses as $value => $label)<option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>@endforeach</select></div>
                 <div class="col-md-4 col-xl-2 d-flex align-items-end"><button class="btn btn-primary w-100" type="submit"><i data-lucide="filter"></i> Lọc</button></div>
@@ -54,8 +55,8 @@
                                         <img src="{{ asset('storage/' . $student->avatar_path) }}" alt=""
                                             class="rounded-circle" style="width:36px;height:36px;object-fit:cover">
                                     @endif
-                                    <strong>
-                                        {{ $student->full_name }}</strong>
+                                    <strong><a href="{{ route('admin.school.students.show', $student) }}" class="text-reset text-decoration-none">
+                                        {{ $student->full_name }}</a></strong>
                                 </div><small
                                     class="d-block text-secondary">{{ $student->email ?: $student->phone ?: 'Chưa cập nhật liên hệ' }}</small>
                             </td>
@@ -63,23 +64,26 @@
                                     class="d-block text-secondary">{{ $enrollment?->class?->grade?->name }}</small></td>
                             <td>{{ $student->date_of_birth?->format('d/m/Y') ?: '-' }}</td>
                             <td><span
-                                    class="status-dot {{ $student->status === 'studying' ? 'status-on' : 'status-off' }}">{{ ['studying' => 'Đang đi học', 'sick_leave' => 'Nghỉ ốm dài ngày', 'reserved' => 'Bảo lưu', 'dropped' => 'Bỏ học', 'graduated' => 'Đã tốt nghiệp'][$student->status] ?? $student->status }}</span>
+                                    class="status-dot {{ $student->status === 'studying' ? 'status-on' : 'status-off' }}">{{ $student->statusLabel() }}</span>
                             </td>
-                            <td class="text-end"><a href="{{ route('admin.school.students.payments', $student) }}" data-modal-readonly="true"
+                            <td class="text-end"><a href="{{ route('admin.school.students.show', $student) }}" class="btn btn-sm btn-light" title="Xem hồ sơ"><i data-lucide="eye"></i></a>
+                                @if(auth()->user()->hasPermission('fees.view'))<a href="{{ route('admin.school.students.payments', $student) }}" data-modal-readonly="true"
                                      class="btn btn-sm btn-light" title="Lịch sử đóng tiền"><i
-                                        data-lucide="receipt-text"></i></a>
+                                        data-lucide="receipt-text"></i></a>@endif
                                 <a href="{{ route('admin.school.students.transcript', $student) }}"
                                     data-modal-readonly="true" class="btn btn-sm btn-light" title="Xem học bạ"><i data-lucide="book-open-check"></i></a>
                                 @if (auth()->user()->hasPermission('students.edit'))
                                     <a href="{{ route('admin.school.students.edit', $student) }}"
                                         class="btn btn-sm btn-light" data-modal-title="Sửa học sinh" title="Sửa"><i
                                             data-lucide="pencil"></i></a>
-                                    @endif @if (auth()->user()->hasPermission('students.delete'))
+                                    @endif @if (auth()->user()->hasPermission('students.delete') && $student->can_delete)
                                         <form action="{{ route('admin.school.students.destroy', $student) }}"
                                             method="POST" class="d-inline" data-modal-title="Xóa học sinh"
                                             data-confirm="Hồ sơ có lịch sử học tập sẽ không được xóa. Bạn có chắc muốn tiếp tục?">
                                             @csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger"
                                                 title="Xóa"><i data-lucide="trash-2"></i></button></form>
+                                    @elseif(auth()->user()->hasPermission('students.delete'))
+                                        <button type="button" class="btn btn-sm btn-light" disabled title="Hồ sơ đã có dữ liệu liên quan"><i data-lucide="shield-ban"></i></button>
                                     @endif
                             </td>
                         </tr>

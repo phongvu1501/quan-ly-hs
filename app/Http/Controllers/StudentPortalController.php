@@ -7,9 +7,11 @@ use App\Models\Announcement;
 use App\Models\Exam;
 use App\Models\FeeNotice;
 use App\Models\FeePayment;
+use App\Models\FeeAssessment;
 use App\Models\Score;
 use App\Models\Schedule;
 use App\Models\Student;
+use Illuminate\Support\Facades\Schema;
 
 class StudentPortalController extends Controller
 {
@@ -75,6 +77,15 @@ class StudentPortalController extends Controller
                 $query->whereNull('published_at')->orWhere('published_at', '<=', now());
             })->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>=', now()))->latest('published_at')->limit(8)->get(),
             'fees' => $this->feeNotices($student, $year?->id, $classId),
+            'feeAssessments' => Schema::hasTable('fee_assessments')
+                ? FeeAssessment::with('category')
+                    ->where('student_id', $student->id)
+                    ->where('academic_year_id', $year?->id)
+                    ->where('status', '!=', 'cancelled')
+                    ->latest('assessment_date')
+                    ->limit(10)
+                    ->get()
+                : collect(),
         ]);
     }
 
@@ -88,10 +99,33 @@ class StudentPortalController extends Controller
             ->where('status', 'active')
             ->latest()
             ->first();
-        $payments = $student->payments()->with(['feeNotice.academicYear', 'feeNotice.semester', 'feeNotice.class'])->latest('paid_at')->latest()->get();
+        $financeReady = Schema::hasTable('fee_assessments')
+            && Schema::hasColumn('fee_payments', 'fee_assessment_id');
+        $assessments = $financeReady
+            ? $student->feeAssessments()
+                ->with(['category', 'academicYear', 'semester', 'payments'])
+                ->latest('assessment_date')
+                ->get()
+            : collect();
+        $payments = $financeReady
+            ? $student->payments()
+                ->whereNotNull('fee_assessment_id')
+                ->with('assessment.category')
+                ->latest('payment_date')
+                ->latest()
+                ->get()
+            : collect();
+        $legacyPayments = $student->payments()
+            ->when($financeReady, fn ($query) => $query->whereNull('fee_assessment_id'))
+            ->with(['feeNotice.academicYear', 'feeNotice.semester', 'feeNotice.class'])
+            ->latest('paid_at')
+            ->latest()
+            ->get();
         $notices = $this->feeNotices($student, $year?->id, $enrollment?->class_id);
 
-        return view('student.payments', compact('student', 'year', 'payments', 'notices'));
+        return view('student.payments', compact(
+            'student', 'year', 'assessments', 'payments', 'legacyPayments', 'notices'
+        ));
     }
 
     private function feeNotices(Student $student, ?int $yearId, ?int $classId)

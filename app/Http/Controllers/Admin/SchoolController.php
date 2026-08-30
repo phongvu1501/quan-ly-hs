@@ -3,6 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\School\StoreStudentRequest;
+use App\Http\Requests\School\StoreTeacherRequest;
+use App\Http\Requests\School\StoreTeachingAssignmentRequest;
+use App\Http\Requests\School\UpdateStudentRequest;
+use App\Http\Requests\School\UpdateTeacherRequest;
+use App\Http\Requests\School\UpdateTeachingAssignmentRequest;
 use App\Models\AcademicYear;
 use App\Models\Announcement;
 use App\Models\AttendanceRecord;
@@ -11,6 +17,7 @@ use App\Models\Exam;
 use App\Models\ExamInvigilation;
 use App\Models\ExamResult;
 use App\Models\FeeNotice;
+use App\Models\FeeAssessment;
 use App\Models\FeePayment;
 use App\Models\Grade;
 use App\Models\Guardian;
@@ -25,13 +32,19 @@ use App\Models\SubjectResult;
 use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use App\Models\User;
+use App\Support\Decimal;
 use App\Notifications\ExamInvigilationAssigned;
+use App\Services\HomeroomAssignmentService;
+use App\Services\StudentService;
+use App\Services\TeacherService;
+use App\Services\TeachingAssignmentService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -258,10 +271,16 @@ class SchoolController extends Controller
             ->count()
             : 0;
 
+        $financeSchemaReady = Schema::hasTable('fee_assessments');
         $feeNotices = $filterAcademicYearId
-            ? FeeNotice::with([
+            ? FeeNotice::with($financeSchemaReady ? [
                 'class.grade',
-                'payments' => fn($query) => $query->whereIn('student_id', $filteredStudentIds),
+                'assessments' => fn ($query) => $query
+                    ->whereIn('student_id', $filteredStudentIds)
+                    ->where('status', '!=', 'cancelled'),
+            ] : [
+                'class.grade',
+                'payments' => fn ($query) => $query->whereIn('student_id', $filteredStudentIds),
             ])
                 ->where('academic_year_id', $filterAcademicYearId)
                 ->where('is_active', true)
@@ -272,13 +291,33 @@ class SchoolController extends Controller
                 ->get()
             : collect();
 
-        $feeBreakdown = $feeNotices->map(function (FeeNotice $notice) use ($activeStudents, $studentCountsByClass): array {
+        $feeBreakdown = $feeNotices->map(function (FeeNotice $notice) use (
+            $activeStudents, $studentCountsByClass, $financeSchemaReady
+        ): array {
+            if ($financeSchemaReady && ! $notice->isLegacy()) {
+                $assessments = $notice->assessments;
+                $expected = Decimal::sum($assessments->pluck('final_amount'));
+                $paid = Decimal::sum($assessments->pluck('paid_amount'));
+                $outstanding = Decimal::sum($assessments->pluck('remaining_amount'));
+
+                return [
+                    'notice' => $notice,
+                    'student_count' => $assessments->pluck('student_id')->unique()->count(),
+                    'paid_students' => $assessments->where('status', 'paid')->pluck('student_id')->unique()->count(),
+                    'expected' => $expected,
+                    'paid' => $paid,
+                    'outstanding' => $outstanding,
+                    'overdue' => $notice->due_on?->isPast() && Decimal::isPositive($outstanding),
+                ];
+            }
+
             $studentCount = $notice->class_id
                 ? (int) ($studentCountsByClass[$notice->class_id] ?? 0)
                 : (int) $activeStudents;
-            $expected = (float) $notice->amount * $studentCount;
+            $expected = Decimal::multiply($notice->amount, $studentCount);
             $paidPayments = $notice->payments->where('status', 'paid');
-            $paid = (float) $paidPayments->sum('amount');
+            $paid = Decimal::sum($paidPayments->pluck('amount'));
+            $outstanding = Decimal::max('0.00', Decimal::subtract($expected, $paid));
 
             return [
                 'notice' => $notice,
@@ -286,13 +325,13 @@ class SchoolController extends Controller
                 'paid_students' => $paidPayments->pluck('student_id')->unique()->count(),
                 'expected' => $expected,
                 'paid' => $paid,
-                'outstanding' => max(0, $expected - $paid),
-                'overdue' => $notice->due_on?->isPast() && $expected > $paid,
+                'outstanding' => $outstanding,
+                'overdue' => $notice->due_on?->isPast() && Decimal::isPositive($outstanding),
             ];
         });
 
-        $paidFees = (float) $feeBreakdown->sum('paid');
-        $outstandingFees = (float) $feeBreakdown->sum('outstanding');
+        $paidFees = Decimal::sum($feeBreakdown->pluck('paid'));
+        $outstandingFees = Decimal::sum($feeBreakdown->pluck('outstanding'));
 
         $classOverview = (clone $classScope)
             ->with(['grade', 'homeroomTeacher'])
@@ -435,16 +474,18 @@ class SchoolController extends Controller
 
 
 
-    public function students(Request $request)
+    public function students(Request $request, StudentService $studentService)
     {
         $search = trim((string) $request->input('q', ''));
         $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
         $classId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
         $status = trim((string) $request->input('status', ''));
+        $admissionYear = trim((string) $request->input('admission_year', ''));
         $students = Student::with(['enrollments' => fn($query) => $query
             ->with('class.grade', 'academicYear')
             ->where('status', 'active')
             ->latest('id')])
+            ->withExists(StudentService::historyExistenceColumns())
             ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('student_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
@@ -452,6 +493,7 @@ class SchoolController extends Controller
                     ->orWhere('phone', 'like', "%{$search}%");
             }))
             ->when($status !== '', fn($query) => $query->where('status', $status))
+            ->when($admissionYear !== '', fn($query) => $query->where('admission_year', $admissionYear))
             ->when($yearId || $classId, fn($query) => $query->whereHas('enrollments', function ($enrollment) use ($yearId, $classId): void {
                 $enrollment->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))
                     ->when($classId, fn($q) => $q->where('class_id', $classId));
@@ -459,12 +501,14 @@ class SchoolController extends Controller
             ->orderBy('full_name')
             ->paginate(15)
             ->withQueryString();
+        $studentService->decorateDeletionEligibility($students->getCollection());
 
         return view('admin.school.students.index', [
             'students' => $students,
             'years' => AcademicYear::orderByDesc('starts_on')->get(),
             'classes' => SchoolClass::with(['academicYear', 'grade'])->where('status', 'active')->orderByDesc('academic_year_id')->orderBy('name')->get(),
-            'studentStatuses' => ['studying' => 'Đang đi học', 'sick_leave' => 'Nghỉ ốm dài ngày', 'reserved' => 'Bảo lưu', 'dropped' => 'Bỏ học', 'graduated' => 'Đã tốt nghiệp'],
+            'studentStatuses' => Student::STATUS_LABELS,
+            'admissionYears' => Student::query()->whereNotNull('admission_year')->distinct()->orderByDesc('admission_year')->pluck('admission_year'),
         ]);
     }
 
@@ -477,22 +521,16 @@ class SchoolController extends Controller
         ]);
     }
 
-    public function storeStudent(Request $request)
+    public function storeStudent(StoreStudentRequest $request, StudentService $studentService)
     {
-        $validated = $this->studentData($request);
-        $student = DB::transaction(function () use ($validated): Student {
-            $student = Student::create($validated['student']);
-            if ($validated['avatar']) {
-                $student->update(['avatar_path' => $validated['avatar']->store('avatars/students', 'public')]);
-            }
-            $this->syncEnrollment($student, $validated['academic_year_id'], $validated['class_id']);
-            $this->syncGuardians($student, $validated['guardians']);
-            $this->createStudentAccount($student);
-
-            return $student;
-        });
+        $student = $studentService->create($request->validated());
 
         return to_route('admin.school.students.index')->with('success', "Đã tạo học sinh và tài khoản {$student->email}. Mật khẩu mặc định: 123456. Học sinh phải đổi mật khẩu khi đăng nhập lần đầu.");
+    }
+
+    public function showStudent(Student $student, StudentService $studentService)
+    {
+        return view('admin.school.students.show', $studentService->detailData($student));
     }
 
     public function editStudent(Student $student)
@@ -509,34 +547,16 @@ class SchoolController extends Controller
         ]);
     }
 
-    public function updateStudent(Request $request, Student $student)
+    public function updateStudent(UpdateStudentRequest $request, Student $student, StudentService $studentService)
     {
-        $validated = $this->studentData($request, $student);
-        DB::transaction(function () use ($student, $validated): void {
-            $student->update($validated['student']);
-            if ($validated['avatar']) {
-                if ($student->avatar_path) {
-                    Storage::disk('public')->delete($student->avatar_path);
-                }
-                $student->update(['avatar_path' => $validated['avatar']->store('avatars/students', 'public')]);
-            }
-            $this->syncEnrollment($student, $validated['academic_year_id'], $validated['class_id']);
-            $this->syncGuardians($student, $validated['guardians']);
-        });
+        $studentService->update($student, $request->validated());
 
         return to_route('admin.school.students.index')->with('success', 'Đã cập nhật hồ sơ học sinh.');
     }
 
-    public function destroyStudent(Student $student)
+    public function destroyStudent(Student $student, StudentService $studentService)
     {
-        if ($student->enrollments()->exists()) {
-            return back()->with('error', 'Học sinh đã có lịch sử học tập nên không thể xóa. Hãy chuyển trạng thái thay vì xóa.');
-        }
-
-        if ($student->avatar_path) {
-            Storage::disk('public')->delete($student->avatar_path);
-        }
-        $student->delete();
+        $studentService->delete($student);
 
         return back()->with('success', 'Đã xóa học sinh.');
     }
@@ -553,11 +573,19 @@ class SchoolController extends Controller
             ->latest()
             ->get();
 
-        return view('admin.school.students.payments', compact('student', 'year', 'notices'));
+        $legacyReadOnly = Schema::hasColumn('fee_payments', 'fee_assessment_id');
+
+        return view('admin.school.students.payments', compact('student', 'year', 'notices', 'legacyReadOnly'));
     }
 
     public function storeStudentPayment(Request $request, Student $student)
     {
+        if (Schema::hasColumn('fee_payments', 'fee_assessment_id')) {
+            throw ValidationException::withMessages([
+                'payment' => 'Giao dịch legacy chỉ được tra cứu. Hãy thu tiền từ fee assessment mới.',
+            ]);
+        }
+
         $data = $request->validate([
             'fee_notice_id' => ['required', 'exists:fee_notices,id'],
             'amount' => ['required', 'numeric', 'min:0'],
@@ -642,7 +670,7 @@ class SchoolController extends Controller
         ));
     }
 
-    public function teachers(Request $request)
+    public function teachers(Request $request, TeacherService $teacherService)
     {
         $search = trim((string) $request->input('q', ''));
         $status = trim((string) $request->input('status', ''));
@@ -650,6 +678,7 @@ class SchoolController extends Controller
         $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
         $classId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
         $teachers = Teacher::withCount(['homeroomClasses', 'assignments'])
+            ->withExists(TeacherService::historyExistenceColumns())
             ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
                 $query->where('teacher_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
@@ -679,11 +708,14 @@ class SchoolController extends Controller
             ->orderBy('full_name')
             ->paginate(15)
             ->withQueryString();
+        $teacherService->decorateDeletionEligibility($teachers->getCollection());
 
         return view('admin.school.teachers.index', [
             'teachers' => $teachers,
-            'teacherStatuses' => ['active' => 'Đang công tác', 'on_leave' => 'Tạm nghỉ', 'inactive' => 'Ngừng công tác'],
+            'teacherStatuses' => Teacher::STATUS_LABELS,
             'teacherType' => $type,
+            'years' => AcademicYear::orderByDesc('starts_on')->get(),
+            'classes' => SchoolClass::with('academicYear')->where('status', 'active')->orderByDesc('academic_year_id')->orderBy('name')->get(),
         ]);
     }
 
@@ -749,21 +781,16 @@ class SchoolController extends Controller
         ]);
     }
 
-    public function storeTeacher(Request $request)
+    public function storeTeacher(StoreTeacherRequest $request, TeacherService $teacherService)
     {
-        $teacherData = $this->teacherData($request);
-        $teacher = DB::transaction(function () use ($request, $teacherData): Teacher {
-            $teacher = Teacher::create($teacherData);
-            $this->storeTeacherAvatar($request, $teacher);
-            if ($teacher->status === 'active') {
-                $this->syncTeacherProfile($request, $teacher);
-            }
-            $this->createTeacherAccount($request, $teacher);
-
-            return $teacher;
-        });
+        $teacher = $teacherService->create($request->validated());
 
         return to_route('admin.school.teachers.index')->with('success', "Đã tạo giáo viên và tài khoản {$teacher->email}. Mật khẩu mặc định: 123456. Giáo viên phải đổi mật khẩu khi đăng nhập lần đầu.");
+    }
+
+    public function showTeacher(Teacher $teacher, TeacherService $teacherService)
+    {
+        return view('admin.school.teachers.show', $teacherService->detailData($teacher));
     }
 
     public function editTeacher(Teacher $teacher)
@@ -785,10 +812,12 @@ class SchoolController extends Controller
             ->orderByDesc('academic_year_id')
             ->orderBy('class_id')
             ->get();
-        $homeroomClasses = $teacher->homeroomClasses()
-            ->with(['academicYear', 'grade'])
-            ->orderByDesc('academic_year_id')
-            ->get();
+        $homeroomAssignments = Schema::hasTable('homeroom_assignments')
+            ? $teacher->homeroomAssignments()->with(['academicYear', 'class.grade'])->orderByDesc('academic_year_id')->get()
+            : collect();
+        $homeroomClasses = $homeroomAssignments->isNotEmpty()
+            ? $homeroomAssignments->pluck('class')->filter()->unique('id')->values()
+            : $teacher->homeroomClasses()->with(['academicYear', 'grade'])->orderByDesc('academic_year_id')->get();
         $schedules = $teacher->schedules()
             ->with(['academicYear', 'semester', 'class.grade', 'subject'])
             ->orderByDesc('academic_year_id')
@@ -804,7 +833,7 @@ class SchoolController extends Controller
         $subjectYears = $teacher->subjects->groupBy(fn($subject) => $subject->pivot->academic_year_id);
         $yearIds = collect()
             ->merge($assignments->pluck('academic_year_id'))
-            ->merge($homeroomClasses->pluck('academic_year_id'))
+            ->merge($homeroomAssignments->pluck('academic_year_id'))
             ->merge($schedules->pluck('academic_year_id'))
             ->merge($examInvigilations->pluck('exam.academic_year_id'))
             ->merge($subjectYears->keys())
@@ -818,38 +847,23 @@ class SchoolController extends Controller
             'years',
             'assignments',
             'homeroomClasses',
+            'homeroomAssignments',
             'schedules',
             'subjectYears',
             'examInvigilations'
         ));
     }
 
-    public function updateTeacher(Request $request, Teacher $teacher)
+    public function updateTeacher(UpdateTeacherRequest $request, Teacher $teacher, TeacherService $teacherService)
     {
-        $teacherData = $this->teacherData($request, $teacher);
-        DB::transaction(function () use ($request, $teacher, $teacherData): void {
-            $teacher->update($teacherData);
-            $this->storeTeacherAvatar($request, $teacher);
-            if ($teacher->status === 'active') {
-                $this->syncTeacherProfile($request, $teacher);
-            } else {
-                $this->deactivateTeacherResponsibilities($teacher);
-            }
-        });
+        $teacherService->update($teacher, $request->validated());
 
         return to_route('admin.school.teachers.index')->with('success', 'Đã cập nhật hồ sơ giáo viên.');
     }
 
-    public function destroyTeacher(Teacher $teacher)
+    public function destroyTeacher(Teacher $teacher, TeacherService $teacherService)
     {
-        if ($teacher->homeroomClasses()->exists() || $teacher->assignments()->exists() || $teacher->examInvigilations()->exists()) {
-            return back()->with('error', 'Giáo viên đang có lớp, môn hoặc lịch coi thi nên không thể xóa.');
-        }
-
-        if ($teacher->avatar_path) {
-            Storage::disk('public')->delete($teacher->avatar_path);
-        }
-        $teacher->delete();
+        $teacherService->delete($teacher);
 
         return back()->with('success', 'Đã xóa giáo viên.');
     }
@@ -1052,7 +1066,7 @@ class SchoolController extends Controller
         ]);
     }
 
-    public function storeClass(Request $request)
+    public function storeClass(Request $request, HomeroomAssignmentService $homeroomService)
     {
         $data = $request->validate([
             'academic_year_id' => ['nullable', 'exists:academic_years,id', 'required_without:academic_year_name'],
@@ -1072,7 +1086,14 @@ class SchoolController extends Controller
         $this->validateHomeroomTeacher($data['homeroom_teacher_id'] ?? null, $year->id);
         $data['academic_year_id'] = $year->id;
         unset($data['academic_year_name']);
-        SchoolClass::create($data);
+        $homeroomTeacherId = isset($data['homeroom_teacher_id']) ? (int) $data['homeroom_teacher_id'] : null;
+        $data['homeroom_teacher_id'] = null;
+        DB::transaction(function () use ($data, $homeroomTeacherId, $homeroomService): void {
+            $class = SchoolClass::create($data);
+            if ($homeroomTeacherId) {
+                $homeroomService->assign($class, Teacher::findOrFail($homeroomTeacherId));
+            }
+        });
 
         return to_route('admin.school.classes.index')->with('success', 'Đã tạo lớp học.');
     }
@@ -1090,7 +1111,7 @@ class SchoolController extends Controller
         ]);
     }
 
-    public function updateClass(Request $request, SchoolClass $schoolClass)
+    public function updateClass(Request $request, SchoolClass $schoolClass, HomeroomAssignmentService $homeroomService)
     {
         $data = $request->validate([
             'academic_year_id' => ['nullable', 'exists:academic_years,id', 'required_without:academic_year_name'],
@@ -1113,17 +1134,44 @@ class SchoolController extends Controller
             $schoolClass->id,
             $schoolClass->homeroom_teacher_id
         );
+        if ((int) $schoolClass->academic_year_id !== (int) $year->id
+            && ($schoolClass->enrollments()->exists() || $schoolClass->assignments()->exists() || $schoolClass->schedules()->exists())) {
+            throw ValidationException::withMessages([
+                'academic_year_id' => 'Không thể đổi năm học của lớp đã phát sinh dữ liệu.',
+            ]);
+        }
         $data['academic_year_id'] = $year->id;
         unset($data['academic_year_name']);
-        $schoolClass->update($data);
+        $newTeacherId = isset($data['homeroom_teacher_id']) ? (int) $data['homeroom_teacher_id'] : null;
+        unset($data['homeroom_teacher_id']);
+        DB::transaction(function () use ($schoolClass, $data, $newTeacherId, $homeroomService): void {
+            $oldTeacherId = $schoolClass->homeroom_teacher_id ? (int) $schoolClass->homeroom_teacher_id : null;
+            $teacherChanged = $oldTeacherId !== $newTeacherId
+                || (int) $schoolClass->academic_year_id !== (int) $data['academic_year_id'];
+            if ($teacherChanged && $oldTeacherId) {
+                $homeroomService->unassign($schoolClass, Teacher::findOrFail($oldTeacherId));
+            }
+            $schoolClass->update($data);
+            if ($teacherChanged && $newTeacherId) {
+                $homeroomService->assign($schoolClass, Teacher::findOrFail($newTeacherId));
+            }
+        });
 
         return to_route('admin.school.classes.index')->with('success', 'Đã cập nhật lớp học.');
     }
 
     public function destroyClass(SchoolClass $schoolClass)
     {
-        if ($schoolClass->enrollments()->exists()) {
-            return back()->with('error', 'Lớp đang có học sinh nên không thể xóa.');
+        $hasHistory = $schoolClass->enrollments()->exists()
+            || $schoolClass->assignments()->exists()
+            || $schoolClass->schedules()->exists()
+            || Score::where('class_id', $schoolClass->id)->exists()
+            || AttendanceRecord::where('class_id', $schoolClass->id)->exists()
+            || FeeAssessment::where('class_id', $schoolClass->id)->exists();
+        if ($hasHistory) {
+            throw ValidationException::withMessages([
+                'class' => 'Không thể xóa lớp đã phát sinh dữ liệu học vụ hoặc tài chính.',
+            ]);
         }
         $schoolClass->delete();
 
@@ -1176,80 +1224,21 @@ class SchoolController extends Controller
             'classes' => SchoolClass::with('grade', 'academicYear')->where('status', 'active')->orderByDesc('academic_year_id')->orderBy('name')->get(),
             'subjects' => Subject::where('is_active', true)->orderBy('name')->get(),
             'teachers' => Teacher::where(function ($query) use ($assignment): void {
-                $query->where('status', 'active')->orWhereKey($assignment->teacher_id);
+                $query->where('status', 'active')->orWhere('id', $assignment->teacher_id);
             })->orderBy('full_name')->get(),
         ]);
     }
 
-    public function storeAssignment(Request $request)
+    public function storeAssignment(StoreTeachingAssignmentRequest $request, TeachingAssignmentService $assignmentService)
     {
-        $data = $request->validate([
-            'academic_year_id' => ['required', 'exists:academic_years,id'],
-            'semester_id' => ['nullable', 'exists:semesters,id'],
-            'class_id' => ['required', 'exists:classes,id'],
-            'subject_id' => ['required', 'exists:subjects,id'],
-            'teacher_id' => ['required', 'exists:teachers,id'],
-            'status' => ['nullable', Rule::in(['active', 'inactive'])],
-        ]);
-        $data['status'] ??= 'active';
-
-        if (! SchoolClass::whereKey($data['class_id'])->where('academic_year_id', $data['academic_year_id'])->exists()) {
-            throw ValidationException::withMessages(['class_id' => 'Lớp không thuộc năm học đã chọn.']);
-        }
-
-        $teacher = Teacher::findOrFail($data['teacher_id']);
-        if ($data['status'] === 'active' && $teacher->status !== 'active') {
-            throw ValidationException::withMessages(['teacher_id' => 'Chỉ giáo viên đang công tác mới được phân công giảng dạy.']);
-        }
-
-        if (! empty($data['semester_id']) && ! Semester::whereKey($data['semester_id'])->where('academic_year_id', $data['academic_year_id'])->exists()) {
-            throw ValidationException::withMessages(['semester_id' => 'Học kỳ không thuộc năm học đã chọn.']);
-        }
-
-        if (TeachingAssignment::where(collect($data)->except('status')->all())->exists()) {
-            throw ValidationException::withMessages(['teacher_id' => 'Phân công này đã tồn tại.']);
-        }
-
-        DB::table('teacher_subject')->upsert([[
-            'teacher_id' => $data['teacher_id'],
-            'subject_id' => $data['subject_id'],
-            'academic_year_id' => $data['academic_year_id'],
-            'is_primary' => false,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]], ['teacher_id', 'subject_id', 'academic_year_id'], ['updated_at']);
-
-        TeachingAssignment::create($data);
+        $assignmentService->create($request->validated());
 
         return back()->with('success', 'Đã tạo phân công giảng dạy.');
     }
 
-    public function updateAssignment(Request $request, TeachingAssignment $assignment)
+    public function updateAssignment(UpdateTeachingAssignmentRequest $request, TeachingAssignment $assignment, TeachingAssignmentService $assignmentService)
     {
-        $data = $request->validate([
-            'academic_year_id' => ['required', 'exists:academic_years,id'],
-            'semester_id' => ['nullable', 'exists:semesters,id'],
-            'class_id' => ['required', 'exists:classes,id'],
-            'subject_id' => ['required', 'exists:subjects,id'],
-            'teacher_id' => ['required', 'exists:teachers,id'],
-            'status' => ['required', Rule::in(['active', 'inactive'])],
-        ]);
-
-        if (! SchoolClass::whereKey($data['class_id'])->where('academic_year_id', $data['academic_year_id'])->exists()) {
-            throw ValidationException::withMessages(['class_id' => 'Lớp không thuộc năm học đã chọn.']);
-        }
-        if (! empty($data['semester_id']) && ! Semester::whereKey($data['semester_id'])->where('academic_year_id', $data['academic_year_id'])->exists()) {
-            throw ValidationException::withMessages(['semester_id' => 'Học kỳ không thuộc năm học đã chọn.']);
-        }
-        $teacher = Teacher::findOrFail($data['teacher_id']);
-        if ($data['status'] === 'active' && $teacher->status !== 'active') {
-            throw ValidationException::withMessages(['teacher_id' => 'Chỉ giáo viên đang công tác mới được phân công giảng dạy.']);
-        }
-        $duplicate = TeachingAssignment::where(collect($data)->except('status')->all())->whereKeyNot($assignment->id)->exists();
-        if ($duplicate) {
-            throw ValidationException::withMessages(['teacher_id' => 'Phân công này đã tồn tại.']);
-        }
-        $assignment->update($data);
+        $assignmentService->update($assignment, $request->validated());
 
         return to_route('admin.school.assignments.index')->with('success', 'Đã cập nhật phân công giảng dạy.');
     }
@@ -1287,11 +1276,13 @@ class SchoolController extends Controller
         ));
     }
 
-    public function destroyAssignment(TeachingAssignment $assignment)
+    public function destroyAssignment(TeachingAssignment $assignment, TeachingAssignmentService $assignmentService)
     {
-        $assignment->delete();
+        $deleted = $assignmentService->deleteOrDeactivate($assignment);
 
-        return back()->with('success', 'Đã xóa phân công giảng dạy.');
+        return back()->with('success', $deleted
+            ? 'Đã xóa phân công chưa phát sinh dữ liệu.'
+            : 'Phân công đã có lịch sử nên được chuyển sang trạng thái kết thúc.');
     }
 
     // public function scores(Request $request)
@@ -1838,16 +1829,32 @@ class SchoolController extends Controller
 
     public function createFee()
     {
+        if (Schema::hasTable('fee_assessments')) {
+            return to_route('admin.finance.fees.index')
+                ->with('warning', 'Khoản thu legacy chỉ còn chế độ tra cứu.');
+        }
+
         return view('admin.school.fees.form', $this->feeFormData());
     }
 
     public function editFee(FeeNotice $fee)
     {
+        if (Schema::hasTable('fee_assessments') && $fee->isLegacy()) {
+            return to_route('admin.school.fees.index')
+                ->with('warning', 'Không thể sửa notice legacy.');
+        }
+
         return view('admin.school.fees.form', $this->feeFormData($fee));
     }
 
     public function storeFee(Request $request)
     {
+        if (Schema::hasTable('fee_assessments')) {
+            throw ValidationException::withMessages([
+                'fee' => 'Hãy dùng chức năng phát sinh học phí mới.',
+            ]);
+        }
+
         FeeNotice::create($this->feeData($request));
 
         return to_route('admin.school.fees.index')->with('success', 'Đã tạo khoản thu học phí.');
@@ -1855,6 +1862,10 @@ class SchoolController extends Controller
 
     public function updateFee(Request $request, FeeNotice $fee)
     {
+        if ($fee->isLegacy()) {
+            throw ValidationException::withMessages(['fee' => 'Không thể sửa notice legacy.']);
+        }
+
         $fee->update($this->feeData($request));
 
         return to_route('admin.school.fees.index')->with('success', 'Đã cập nhật khoản thu học phí.');
@@ -1862,6 +1873,12 @@ class SchoolController extends Controller
 
     public function destroyFee(FeeNotice $fee)
     {
+        if ($fee->isLegacy() || $fee->assessments()->exists() || $fee->payments()->exists()) {
+            throw ValidationException::withMessages([
+                'fee' => 'Không thể xóa khoản thu đã có lịch sử tài chính.',
+            ]);
+        }
+
         $fee->delete();
 
         return back()->with('success', 'Đã xóa khoản thu học phí.');

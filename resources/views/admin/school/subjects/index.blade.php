@@ -5,8 +5,11 @@
             <p class="eyebrow">Chương trình học</p>
             <h1>Môn học</h1>
             <p class="text-secondary mb-0">Danh mục môn học và số tiết tiêu chuẩn trong tuần.</p>
-        </div><a href="{{ route('admin.school.subjects.create') }}" class="btn btn-primary" data-modal-title="Thêm môn học"><i
-                data-lucide="plus"></i> Thêm môn học</a>
+        </div>
+        @if (auth()->user()->hasPermission('subjects.create'))
+            <a href="{{ route('admin.school.subjects.create') }}" class="btn btn-primary" data-modal-title="Thêm môn học"><i
+                    data-lucide="plus"></i> Thêm môn học</a>
+        @endif
     </div>
     <div class="card filter-card mb-4"><div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-3 mb-3"><div><strong>Bộ lọc môn học</strong><small class="d-block text-secondary">Lọc theo trạng thái sử dụng.</small></div><a class="btn btn-sm btn-light" href="{{ route('admin.school.subjects.index') }}" title="Đặt lại bộ lọc"><i data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a></div>
@@ -50,14 +53,19 @@
                             <td><span
                                     class="status-dot {{ $subject->is_active ? 'status-on' : 'status-off' }}">{{ $subject->is_active ? 'Đang dùng' : 'Tạm ẩn' }}</span>
                             </td>
-                            <td class="text-end"><a href="{{ route('admin.school.subjects.edit', $subject) }}"
-                                    class="btn btn-sm btn-light" data-modal-title="Sửa môn học" title="Sửa"><i
-                                        data-lucide="pencil"></i></a>
-                                <form action="{{ route('admin.school.subjects.destroy', $subject) }}" method="POST"
-                                    class="d-inline" data-modal-title="Xóa môn học"
-                                    data-confirm="Môn học có phân công sẽ không thể xóa.">@csrf @method('DELETE')<button
-                                        class="btn btn-sm btn-outline-danger" title="Xóa"><i
-                                            data-lucide="trash-2"></i></button></form>
+                            <td class="text-end">
+                                @if (auth()->user()->hasPermission('subjects.edit'))
+                                    <a href="{{ route('admin.school.subjects.edit', $subject) }}"
+                                        class="btn btn-sm btn-light" data-modal-title="Sửa môn học" title="Sửa"><i
+                                            data-lucide="pencil"></i></a>
+                                @endif
+                                @if (auth()->user()->hasPermission('subjects.delete'))
+                                    <form action="{{ route('admin.school.subjects.destroy', $subject) }}" method="POST"
+                                        class="d-inline" data-modal-title="Xóa môn học"
+                                        data-confirm="Môn học có phân công sẽ không thể xóa.">@csrf @method('DELETE')<button
+                                            class="btn btn-sm btn-outline-danger" title="Xóa"><i
+                                                data-lucide="trash-2"></i></button></form>
+                                @endif
                             </td>
                     </tr>@empty<tr>
                             <td colspan="6" class="empty-state">Chưa có môn học.</td>

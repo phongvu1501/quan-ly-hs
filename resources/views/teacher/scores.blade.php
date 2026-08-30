@@ -2,6 +2,11 @@
 
 @section('title', 'Sổ điểm giáo viên')
 
+@php
+    $canCreateScores = auth()->user()->hasPermission('scores.create');
+    $canEditScores = auth()->user()->hasPermission('scores.edit');
+@endphp
+
 @section('content')
     <div class="page-heading page-heading-inline">
         <div>
@@ -29,14 +34,18 @@
         <div class="card table-card">
             <div class="card-body border-bottom d-flex justify-content-between align-items-center gap-3">
                 <div><strong>{{ $assignment->class?->name }} · {{ $assignment->subject?->name }}</strong><small
-                        class="d-block text-secondary">Nhập hoặc sửa điểm cho nhiều học sinh rồi lưu một lần.</small></div><a
-                    class="btn btn-sm btn-light"
-                    href="{{ route('teacher.attendance', ['class_id' => $assignment->class_id]) }}"><i
-                        data-lucide="clipboard-check"></i> Điểm danh lớp</a>
+                        class="d-block text-secondary">Theo dõi điểm theo lớp và môn được phân công.</small></div>
+                @if (auth()->user()->hasPermission('attendance.view'))
+                    <a class="btn btn-sm btn-light"
+                        href="{{ route('teacher.attendance', ['class_id' => $assignment->class_id]) }}"><i
+                            data-lucide="clipboard-check"></i> Điểm danh lớp</a>
+                @endif
             </div>
-            <form action="{{ route('teacher.scores.store') }}" method="POST" id="scores-form">
-                @csrf
-                <input type="hidden" name="assignment_id" value="{{ $assignment->id }}">
+            @if ($canCreateScores)
+                <form action="{{ route('teacher.scores.store') }}" method="POST" id="scores-form">
+                    @csrf
+                    <input type="hidden" name="assignment_id" value="{{ $assignment->id }}">
+            @endif
                 <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead>
@@ -70,22 +79,38 @@
                                         <span class="text-secondary">Chưa có</span>
                                     @endif
                                 </td>
-                                <td><select name="scores[{{ $studentId }}][score_type]"
-                                        class="form-select form-select-sm">
-                                        <option value="oral" @selected(($latestScore?->score_type ?: 'oral') === 'oral')>Miệng</option>
-                                        <option value="fifteen_minute" @selected($latestScore?->score_type === 'fifteen_minute')>15 phút</option>
-                                        <option value="one_period" @selected($latestScore?->score_type === 'one_period')>1 tiết</option>
-                                        <option value="midterm" @selected($latestScore?->score_type === 'midterm')>Giữa kỳ</option>
-                                        <option value="final" @selected($latestScore?->score_type === 'final')>Cuối kỳ</option>
-                                    </select></td>
-                                <td><input id="{{ $scoreInputId }}" type="number" name="scores[{{ $studentId }}][score]"
-                                        class="form-control form-control-sm" min="0" max="10" step="0.01"
-                                        value="{{ old('scores.' . $studentId . '.score', '') }}"></td>
+                                <td>
+                                    @if ($canCreateScores)
+                                        <select name="scores[{{ $studentId }}][score_type]" class="form-select form-select-sm">
+                                            <option value="oral">Miệng</option>
+                                            <option value="fifteen_minute">15 phút</option>
+                                            <option value="one_period">1 tiết</option>
+                                            <option value="midterm">Giữa kỳ</option>
+                                            <option value="final">Cuối kỳ</option>
+                                        </select>
+                                    @else
+                                        <span class="text-secondary">{{ $latestScore?->score_type ?: '-' }}</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($canCreateScores)
+                                        <input id="{{ $scoreInputId }}" type="number" name="scores[{{ $studentId }}][score]"
+                                            class="form-control form-control-sm" min="0" max="10" step="0.01"
+                                            value="{{ old('scores.' . $studentId . '.score', '') }}">
+                                    @else
+                                        {{ $latestScore?->score ?? '-' }}
+                                    @endif
+                                </td>
                                 <td><strong>{{ $subjectAverage !== null ? number_format((float) $subjectAverage, 2) : '-' }}</strong><small class="d-block text-secondary">{{ $summary['rating'] ?? 'Chưa đủ dữ liệu' }} @if ($summary && $summary['reward'])<span class="text-success">· Khen thưởng</span>@endif</small></td>
-                                <td><input type="date" name="scores[{{ $studentId }}][assessed_on]"
-                                        class="form-control form-control-sm" value="{{ old('scores.' . $studentId . '.assessed_on', now()->format('Y-m-d')) }}"></td>
+                                <td>
+                                    @if ($canCreateScores)
+                                        <input type="date" name="scores[{{ $studentId }}][assessed_on]"
+                                            class="form-control form-control-sm" value="{{ old('scores.' . $studentId . '.assessed_on', now()->format('Y-m-d')) }}">
+                                    @else
+                                        {{ $latestScore?->assessed_on?->format('d/m/Y') ?: '-' }}
+                                    @endif
+                                </td>
                                 <td class="text-end">
-                                    <input type="hidden" name="scores[{{ $studentId }}][score_id]" value="">
                                     @if ($latestScore)
                                         <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal"
                                             data-bs-target="#scoreEditModal-{{ $studentId }}" title="Xem chi tiết tất cả điểm"><i data-lucide="list-checks"></i><span class="visually-hidden">Xem chi tiết tất cả điểm</span></button>
@@ -100,9 +125,11 @@
                     </tbody>
                 </table>
                 </div>
-                <div class="p-3 border-top d-flex justify-content-end"><button class="btn btn-primary" type="submit"><i
-                            data-lucide="save"></i> Lưu toàn bộ điểm</button></div>
-            </form>
+                @if ($canCreateScores)
+                    <div class="p-3 border-top d-flex justify-content-end"><button class="btn btn-primary" type="submit"><i
+                                data-lucide="save"></i> Lưu toàn bộ điểm</button></div>
+                    </form>
+                @endif
         </div>
 
         @foreach ($students as $enrollment)
@@ -116,26 +143,35 @@
                                 <h2 class="modal-title fs-5" id="scoreEditTitle-{{ $enrollment->student_id }}">Chi tiết các hệ điểm · {{ $enrollment->student?->full_name }}</h2>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                             </div>
-                            <form action="{{ route('teacher.scores.store') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="assignment_id" value="{{ $assignment->id }}">
-                                <div class="modal-body">
+                            <div class="modal-body">
                                     <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Hệ điểm</th><th>Điểm</th><th>Ngày</th><th>Ghi chú</th></tr></thead><tbody>
                                         @foreach ($studentScores as $scoreIndex => $score)
                                             <tr>
-                                                @php($scoreKey = $enrollment->student_id . '_' . $scoreIndex)
-                                                <td><input type="hidden" name="scores[{{ $scoreKey }}][score_id]" value="{{ $score->id }}"><select name="scores[{{ $scoreKey }}][score_type]" class="form-select form-select-sm" required>
-                                                    <option value="oral" @selected($score->score_type === 'oral')>Miệng</option><option value="fifteen_minute" @selected($score->score_type === 'fifteen_minute')>15 phút</option><option value="one_period" @selected($score->score_type === 'one_period')>1 tiết</option><option value="midterm" @selected($score->score_type === 'midterm')>Giữa kỳ</option><option value="final" @selected($score->score_type === 'final')>Cuối kỳ</option>
-                                                </select></td>
-                                                <td><input type="number" name="scores[{{ $scoreKey }}][score]" value="{{ $score->score }}" class="form-control form-control-sm" min="0" max="10" step="0.01" required></td>
-                                                <td><input type="date" name="scores[{{ $scoreKey }}][assessed_on]" value="{{ $score->assessed_on?->format('Y-m-d') }}" class="form-control form-control-sm"></td>
-                                                <td><input name="scores[{{ $scoreKey }}][note]" value="{{ $score->note }}" class="form-control form-control-sm"></td>
+                                                @php($scoreFormId = 'score-update-' . $score->id)
+                                                <td>
+                                                    @if ($canEditScores)
+                                                        <form id="{{ $scoreFormId }}" action="{{ route('teacher.scores.update', $score) }}" method="POST">@csrf @method('PUT')</form>
+                                                        <select name="score_type" form="{{ $scoreFormId }}" class="form-select form-select-sm" required>
+                                                            <option value="oral" @selected($score->score_type === 'oral')>Miệng</option><option value="fifteen_minute" @selected($score->score_type === 'fifteen_minute')>15 phút</option><option value="one_period" @selected($score->score_type === 'one_period')>1 tiết</option><option value="midterm" @selected($score->score_type === 'midterm')>Giữa kỳ</option><option value="final" @selected($score->score_type === 'final')>Cuối kỳ</option>
+                                                        </select>
+                                                    @else
+                                                        {{ $score->score_type }}
+                                                    @endif
+                                                </td>
+                                                <td>@if ($canEditScores)<input type="number" name="score" form="{{ $scoreFormId }}" value="{{ $score->score }}" class="form-control form-control-sm" min="0" max="10" step="0.01" required>@else{{ $score->score }}@endif</td>
+                                                <td>@if ($canEditScores)<input type="date" name="assessed_on" form="{{ $scoreFormId }}" value="{{ $score->assessed_on?->format('Y-m-d') }}" class="form-control form-control-sm">@else{{ $score->assessed_on?->format('d/m/Y') ?: '-' }}@endif</td>
+                                                <td>
+                                                    @if ($canEditScores)
+                                                        <div class="d-flex gap-2"><input name="note" form="{{ $scoreFormId }}" value="{{ $score->note }}" class="form-control form-control-sm"><button type="submit" form="{{ $scoreFormId }}" class="btn btn-sm btn-primary" title="Lưu điểm"><i data-lucide="save"></i></button></div>
+                                                    @else
+                                                        {{ $score->note ?: '-' }}
+                                                    @endif
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody></table></div>
-                                </div>
-                                <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button><button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Cập nhật các hệ điểm</button></div>
-                            </form>
+                            </div>
+                            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Đóng</button></div>
                         </div>
                     </div>
                 </div>

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Menu;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use App\Services\PermissionResolver;
 
 class MenuService
 {
@@ -12,11 +13,7 @@ class MenuService
     {
         $roles = $user->roles()->with('permissions:id,slug')->get();
         $roleIds = $roles->pluck('id');
-        $permissionSlugs = $roles
-            ->flatMap(fn ($role) => $role->permissions->pluck('slug'))
-            ->unique()
-            ->values();
-        $canManageMenus = $permissionSlugs->contains('menus.manage');
+        $permissionSlugs = app(PermissionResolver::class)->userSlugs($user);
 
         $menus = Menu::query()
             ->where('is_active', true)
@@ -27,8 +24,7 @@ class MenuService
 
         $visibleIds = $menus
             ->filter(
-                fn (Menu $menu) => $canManageMenus
-                    || $menu->isVisibleTo($roleIds, $permissionSlugs)
+                fn (Menu $menu) => $menu->isVisibleTo($roleIds, $permissionSlugs)
             )
             ->pluck('id');
 

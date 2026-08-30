@@ -33,14 +33,14 @@
         </a>@else
     </div>
     @endif
-    @if (auth()->user()->hasPermission('subject_teacher.dashboard'))
+    @if (auth()->user()->hasPermission('teacher.dashboard'))
     <a class="overview-item text-decoration-none" href="{{ route('teacher.subject.dashboard') }}">@else<div
                 class="overview-item">
     @endif
     <span class="overview-icon"><i data-lucide="book-open-check"></i></span>
     <h2>Phân công bộ môn</h2>
     <p class="fs-3 fw-bold text-dark mb-0">{{ $assignments->count() }}</p>
-    @if (auth()->user()->hasPermission('subject_teacher.dashboard'))
+    @if (auth()->user()->hasPermission('teacher.dashboard'))
     </a>@else</div>
     @endif
     <a class="overview-item text-decoration-none" href="{{ route('teacher.attendance') }}"><span class="overview-icon"><i

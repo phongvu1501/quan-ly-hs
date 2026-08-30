@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Services\PermissionResolver;
 
 class Role extends Model
 {
@@ -30,8 +31,6 @@ class Role extends Model
 
     public function hasPermission(string $permission): bool
     {
-        return $this->permissions()
-            ->where('slug', $permission)
-            ->exists();
+        return app(PermissionResolver::class)->roleHas($this, $permission);
     }
 }

@@ -892,7 +892,7 @@
                 <div class="db-kpi-label">Học sinh</div>
                 <div class="db-kpi-value">{{ number_format($students) }}</div>
                 <div class="db-kpi-note">Đang học theo bộ lọc</div>
-                @if(auth()->user()->hasPermission('students.manage'))<a class="db-kpi-link"
+                @if(auth()->user()->hasPermission('students.view'))<a class="db-kpi-link"
                     href="{{ route('admin.school.students.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
                     data-modal-url="{{ route('admin.school.students.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
                     data-modal-readonly="true" data-modal-title="Danh sách học sinh">Xem danh sách →</a>@endif
@@ -903,7 +903,7 @@
                 <div class="db-kpi-label">Giáo viên</div>
                 <div class="db-kpi-value">{{ number_format($teachers) }}</div>
                 <div class="db-kpi-note">Đang công tác</div>
-                @if(auth()->user()->hasPermission('teachers.manage'))<a class="db-kpi-link" href="{{ route('admin.school.teachers.index', ['status' => 'active', 'academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
+                @if(auth()->user()->hasPermission('teachers.view'))<a class="db-kpi-link" href="{{ route('admin.school.teachers.index', ['status' => 'active', 'academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
                     data-modal-url="{{ route('admin.school.teachers.index', ['status' => 'active', 'academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"
                     data-modal-readonly="true" data-modal-title="Danh sách giáo viên">Xem danh sách →</a>@endif
             </div>
@@ -913,7 +913,7 @@
                 <div class="db-kpi-label">Lớp học</div>
                 <div class="db-kpi-value">{{ number_format($classes) }}</div>
                 <div class="db-kpi-note">{{ $classes ? number_format($students / $classes, 1) : 0 }} học sinh/lớp</div>
-                @if(auth()->user()->hasPermission('classes.manage'))<a class="db-kpi-link"
+                @if(auth()->user()->hasPermission('classes.view'))<a class="db-kpi-link"
                     href="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"
                     data-modal-url="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"
                     data-modal-readonly="true" data-modal-title="Danh sách lớp học">Xem lớp học →</a>@endif
@@ -1218,7 +1218,7 @@
                         <h2 class="db-panel-title">Xu hướng chuyên cần</h2>
                         <p class="db-panel-subtitle">14 ngày có dữ liệu gần nhất trong khoảng đã lọc.</p>
                     </div>
-                    @if(auth()->user()->hasPermission('attendance.manage'))
+                    @if(auth()->user()->hasPermission('attendance.view'))
                         <a class="db-panel-action text-decoration-none" href="{{ route('admin.school.attendance.index', ['academic_year_id' => $filterAcademicYearId, 'date_from' => $filterDateFrom, 'date_to' => $filterDateTo, 'class_id' => $filterClassId]) }}">Mở điểm danh</a>
                     @endif
                 </div>
@@ -1286,7 +1286,7 @@
                             <h2 class="db-panel-title">Thông báo mới nhất</h2>
                             <p class="db-panel-subtitle">Các thông báo đã phát hành.</p>
                         </div>
-                        @if(auth()->user()->hasPermission('announcements.manage'))
+                        @if(auth()->user()->hasPermission('announcements.view'))
                             <a class="db-panel-action text-decoration-none" href="{{ route('admin.school.announcements.index') }}">Xem tất cả</a>
                         @endif
                     </div>
@@ -1366,42 +1366,42 @@
             </div>
 
             <div class="db-quick">
-                @if(auth()->user()->hasPermission('students.manage'))
+                @if(auth()->user()->hasPermission('students.view'))
                 <a href="{{ route('admin.school.students.index') }}">
                     <i data-lucide="graduation-cap"></i>
                     Học sinh
                 </a>
                 @endif
 
-                @if(auth()->user()->hasPermission('teachers.manage'))
+                @if(auth()->user()->hasPermission('teachers.view'))
                 <a href="{{ route('admin.school.teachers.index') }}">
                     <i data-lucide="contact-round"></i>
                     Giáo viên
                 </a>
                 @endif
 
-                @if(auth()->user()->hasPermission('classes.manage'))
+                @if(auth()->user()->hasPermission('classes.view'))
                 <a href="{{ route('admin.school.classes.index') }}">
                     <i data-lucide="school"></i>
                     Lớp học
                 </a>
                 @endif
 
-                @if(auth()->user()->hasPermission('subjects.manage'))
+                @if(auth()->user()->hasPermission('subjects.view'))
                 <a href="{{ route('admin.school.subjects.index') }}">
                     <i data-lucide="book-open"></i>
                     Môn học
                 </a>
                 @endif
 
-                @if(auth()->user()->hasPermission('attendance.manage'))
+                @if(auth()->user()->hasPermission('attendance.view'))
                 <button type="button" data-dashboard-modal="#absentModal">
                     <i data-lucide="calendar-check-2"></i>
                     Điểm danh
                 </button>
                 @endif
 
-                @if(auth()->user()->hasPermission('fees.manage'))
+                @if(auth()->user()->hasPermission('fees.view'))
                 <button type="button" data-dashboard-modal="#feeModal">
                     <i data-lucide="wallet-cards"></i>
                     Học phí
@@ -1483,7 +1483,7 @@
                     </div>
 
                 </div>
-                @if(auth()->user()->hasPermission('attendance.manage'))
+                @if(auth()->user()->hasPermission('attendance.view'))
                     <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.attendance.index', ['academic_year_id' => $filterAcademicYearId, 'date_from' => $filterDateFrom, 'date_to' => $filterDateTo, 'class_id' => $filterClassId]) }}"><i data-lucide="external-link"></i> Mở quản lý điểm danh</a></div>
                 @endif
             </div>
@@ -1552,7 +1552,7 @@
                     </div>
 
                 </div>
-                @if(auth()->user()->hasPermission('fees.manage'))
+                @if(auth()->user()->hasPermission('fees.view'))
                     <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.fees.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"><i data-lucide="external-link"></i> Mở quản lý học phí</a></div>
                 @endif
             </div>
@@ -1605,7 +1605,7 @@
                     @endforelse
 
                 </div>
-                @if(auth()->user()->hasPermission('exams.manage'))
+                @if(auth()->user()->hasPermission('exams.view'))
                     <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.exams.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId, 'date_from' => $filterDateFrom, 'date_to' => $filterDateTo]) }}"><i data-lucide="external-link"></i> Mở quản lý lịch thi</a></div>
                 @endif
             </div>
@@ -1685,7 +1685,7 @@
                     </div>
 
                 </div>
-                @if(auth()->user()->hasPermission('scores.manage'))
+                @if(auth()->user()->hasPermission('scores.view'))
                     <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.scores.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId, 'grade_id' => $filterGradeId]) }}"><i data-lucide="external-link"></i> Mở quản lý điểm</a></div>
                 @endif
             </div>
@@ -1744,7 +1744,7 @@
                     </div>
 
                 </div>
-                @if(auth()->user()->hasPermission('classes.manage'))
+                @if(auth()->user()->hasPermission('classes.view'))
                     <div class="modal-footer"><a class="btn btn-primary" href="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"><i data-lucide="external-link"></i> Mở quản lý lớp</a></div>
                 @endif
             </div>
@@ -1795,9 +1795,9 @@
                     </div>
                 </div>
                 <div class="modal-footer d-flex flex-wrap gap-2">
-                    @if(auth()->user()->hasPermission('assignments.manage'))<a class="btn btn-light" href="{{ route('admin.school.assignments.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"><i data-lucide="network"></i> Phân công</a>@endif
-                    @if(auth()->user()->hasPermission('schedules.manage'))<a class="btn btn-light" href="{{ route('admin.school.schedules.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"><i data-lucide="calendar-days"></i> Thời khóa biểu</a>@endif
-                    @if(auth()->user()->hasPermission('classes.manage'))<a class="btn btn-primary" href="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"><i data-lucide="school"></i> Quản lý lớp</a>@endif
+                    @if(auth()->user()->hasPermission('assignments.view'))<a class="btn btn-light" href="{{ route('admin.school.assignments.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"><i data-lucide="network"></i> Phân công</a>@endif
+                    @if(auth()->user()->hasPermission('schedules.view'))<a class="btn btn-light" href="{{ route('admin.school.schedules.index', ['academic_year_id' => $filterAcademicYearId, 'class_id' => $filterClassId]) }}"><i data-lucide="calendar-days"></i> Thời khóa biểu</a>@endif
+                    @if(auth()->user()->hasPermission('classes.view'))<a class="btn btn-primary" href="{{ route('admin.school.classes.index', ['academic_year_id' => $filterAcademicYearId, 'grade_id' => $filterGradeId]) }}"><i data-lucide="school"></i> Quản lý lớp</a>@endif
                 </div>
             </div>
         </div>

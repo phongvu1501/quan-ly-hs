@@ -7,7 +7,7 @@
         <div>
             <p class="eyebrow">Cấu hình hệ thống</p>
             <h1>Điều hướng</h1>
-            <p class="text-secondary mb-0">Menu cha/con trong DB sẽ tự dựng thành cây ở sidebar.</p>
+            <p class="text-secondary mb-0">Menu cha/con sẽ tự dựng thành cây ở sidebar.</p>
         </div>
         @if (auth()->user()->hasPermission('menus.create'))
             <a href="{{ route('admin.menus.create') }}" class="btn btn-primary" data-modal-title="Thêm menu"><i

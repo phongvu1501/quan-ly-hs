@@ -6,8 +6,11 @@
             <p class="eyebrow">Cấu trúc đào tạo</p>
             <h1>Khối lớp</h1>
             <p class="text-secondary mb-0">Khối 10, 11, 12 được dùng để phân loại lớp.</p>
-        </div><a href="{{ route('admin.school.grades.create') }}" class="btn btn-primary" data-modal-title="Thêm khối lớp"><i
-                data-lucide="plus"></i> Thêm khối lớp</a>
+        </div>
+        @if (auth()->user()->hasPermission('grades.create'))
+            <a href="{{ route('admin.school.grades.create') }}" class="btn btn-primary" data-modal-title="Thêm khối lớp"><i
+                    data-lucide="plus"></i> Thêm khối lớp</a>
+        @endif
     </div>
     <div class="card filter-card mb-4"><div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-3 mb-3"><div><strong>Bộ lọc khối lớp</strong><small class="d-block text-secondary">Chọn khối để xem nhanh danh sách.</small></div><a class="btn btn-sm btn-light" href="{{ route('admin.school.grades.index') }}" title="Đặt lại bộ lọc"><i data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a></div>
@@ -36,14 +39,19 @@
                             <td>{{ $grade->name }}</td>
                             <td>{{ $grade->classes_count }}</td>
                             <td class="text-secondary">{{ $grade->description ?: '-' }}</td>
-                            <td class="text-end"><a href="{{ route('admin.school.grades.edit', $grade) }}"
-                                    class="btn btn-sm btn-light" data-modal-title="Sửa khối lớp" title="Sửa"><i
-                                        data-lucide="pencil"></i></a>
-                                <form action="{{ route('admin.school.grades.destroy', $grade) }}" method="POST"
-                                    class="d-inline" data-modal-title="Xóa khối lớp"
-                                    data-confirm="Khối có lớp đang sử dụng sẽ không thể xóa.">@csrf @method('DELETE')<button
-                                        class="btn btn-sm btn-outline-danger" title="Xóa"><i
-                                            data-lucide="trash-2"></i></button></form>
+                            <td class="text-end">
+                                @if (auth()->user()->hasPermission('grades.edit'))
+                                    <a href="{{ route('admin.school.grades.edit', $grade) }}"
+                                        class="btn btn-sm btn-light" data-modal-title="Sửa khối lớp" title="Sửa"><i
+                                            data-lucide="pencil"></i></a>
+                                @endif
+                                @if (auth()->user()->hasPermission('grades.delete'))
+                                    <form action="{{ route('admin.school.grades.destroy', $grade) }}" method="POST"
+                                        class="d-inline" data-modal-title="Xóa khối lớp"
+                                        data-confirm="Khối có lớp đang sử dụng sẽ không thể xóa.">@csrf @method('DELETE')<button
+                                            class="btn btn-sm btn-outline-danger" title="Xóa"><i
+                                                data-lucide="trash-2"></i></button></form>
+                                @endif
                             </td>
                     </tr>@empty<tr>
                             <td colspan="5" class="empty-state">Chưa có khối lớp.</td>

@@ -50,7 +50,7 @@
                     </div>
                     <div class="col-md-4"><label class="form-label">Trạng thái</label><select name="status"
                             class="form-select" required>
-                            @foreach (['studying' => 'Đang đi học', 'sick_leave' => 'Nghỉ ốm dài ngày', 'reserved' => 'Bảo lưu', 'dropped' => 'Bỏ học', 'graduated' => 'Đã tốt nghiệp'] as $value => $label)
+                            @foreach (\App\Models\Student::STATUS_LABELS as $value => $label)
                                 <option value="{{ $value }}" @selected(old('status', $student?->status ?: 'studying') === $value)>{{ $label }}
                                 </option>
                             @endforeach

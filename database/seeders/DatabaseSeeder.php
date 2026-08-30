@@ -2,17 +2,18 @@
 
 namespace Database\Seeders;
 
-use App\Models\Permission;
-use App\Models\Role;
 use App\Models\AcademicYear;
 use App\Models\Grade;
-use App\Models\Semester;
-use App\Models\Subject;
+use App\Models\HomeroomAssignment;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Schedule;
-use App\Models\TeachingAssignment;
-use App\Models\Student;
-use App\Models\Teacher;
 use App\Models\SchoolClass;
+use App\Models\Semester;
+use App\Models\Student;
+use App\Models\Subject;
+use App\Models\Teacher;
+use App\Models\TeachingAssignment;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -33,6 +34,8 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Quản trị viên', 'description' => 'Toàn quyền quản trị hệ thống']
         );
 
+        $this->call(PermissionSeeder::class);
+
         $admin->permissions()->syncWithoutDetaching(Permission::pluck('id'));
 
         $user = User::firstOrCreate(
@@ -49,7 +52,7 @@ class DatabaseSeeder extends Seeder
                 'must_change_password' => false,
             ]
         );
-        $hang->roles()->sync(
+        $hang->roles()->syncWithoutDetaching(
             Role::whereIn('slug', ['admin', 'teacher', 'student', 'homeroom_teacher', 'subject_teacher'])->pluck('id')
         );
 
@@ -61,7 +64,11 @@ class DatabaseSeeder extends Seeder
                 'status' => 'studying',
             ]
         );
-        $hangStudent->update(['user_id' => $hang->id]);
+        if ($hangStudent->user_id === null) {
+            $hangStudent->update(['user_id' => $hang->id]);
+        } elseif ((int) $hangStudent->user_id !== (int) $hang->id) {
+            $this->command?->warn('Bỏ qua liên kết HANG-TEST student vì hồ sơ đã thuộc một user khác.');
+        }
 
         $startYear = now()->year;
         $academicYear = AcademicYear::firstOrCreate(
@@ -106,12 +113,14 @@ class DatabaseSeeder extends Seeder
         }
 
         $hangTeacher = Teacher::where('user_id', $hang->id)->first();
-        if (!$hangTeacher) {
+        if (! $hangTeacher) {
             $hangTeacher = Teacher::firstOrCreate(
                 ['teacher_code' => 'HANG-TEST'],
                 ['full_name' => 'Hang Test', 'email' => 'hang@gmail.com', 'status' => 'active', 'user_id' => $hang->id]
             );
-            $hangTeacher->update(['user_id' => $hang->id]);
+            if ($hangTeacher->user_id === null) {
+                $hangTeacher->update(['user_id' => $hang->id]);
+            }
         }
 
         $now = now();
@@ -146,7 +155,7 @@ class DatabaseSeeder extends Seeder
                 ['academic_year_id' => $academicYear->id, 'code' => 'HANG-10A2'],
                 [
                     'grade_id' => $grade10->id,
-                    'homeroom_teacher_id' => $hangTeacher->id,
+                    'homeroom_teacher_id' => null,
                     'name' => '10A2 - Lớp demo',
                     'room' => 'A102',
                     'capacity' => 45,
@@ -159,13 +168,25 @@ class DatabaseSeeder extends Seeder
                 ['academic_year_id' => $academicYear->id, 'code' => 'HANG-11A1'],
                 [
                     'grade_id' => $grade11->id,
-                    'homeroom_teacher_id' => $hangTeacher->id,
+                    'homeroom_teacher_id' => null,
                     'name' => '11A1 - Lớp demo',
                     'room' => 'B201',
                     'capacity' => 45,
                     'status' => 'active',
                 ]
             ) : null;
+
+            if ((int) $classA->homeroom_teacher_id === (int) $hangTeacher->id) {
+                HomeroomAssignment::firstOrCreate(
+                    [
+                        'teacher_id' => $hangTeacher->id,
+                        'class_id' => $classA->id,
+                        'academic_year_id' => $academicYear->id,
+                        'status' => HomeroomAssignment::STATUS_ACTIVE,
+                    ],
+                    ['started_on' => $classA->wasRecentlyCreated ? today() : null]
+                );
+            }
 
             $semester = Semester::where('academic_year_id', $academicYear->id)->where('number', 1)->first();
             $subjects = Subject::whereIn('code', ['MATH', 'LIT', 'ENG', 'PHYS', 'BIO'])->get()->keyBy('code');
@@ -178,9 +199,11 @@ class DatabaseSeeder extends Seeder
             ];
 
             foreach ($demoScheduleRows as [$class, $subjectCode, $weekday, $period, $room]) {
-                if (!$class || !$semester || !$subjects->get($subjectCode)) continue;
+                if (! $class || ! $semester || ! $subjects->get($subjectCode)) {
+                    continue;
+                }
 
-                $assignment = TeachingAssignment::updateOrCreate(
+                $assignment = TeachingAssignment::firstOrCreate(
                     [
                         'academic_year_id' => $academicYear->id,
                         'semester_id' => $semester->id,
@@ -191,7 +214,7 @@ class DatabaseSeeder extends Seeder
                     ['status' => 'active']
                 );
 
-                Schedule::updateOrCreate(
+                Schedule::firstOrCreate(
                     [
                         'semester_id' => $semester->id,
                         'class_id' => $class->id,
@@ -208,7 +231,7 @@ class DatabaseSeeder extends Seeder
                 );
             }
 
-            $hangStudent->enrollments()->updateOrCreate(
+            $hangStudent->enrollments()->firstOrCreate(
                 ['academic_year_id' => $academicYear->id],
                 ['class_id' => $classA->id, 'status' => 'active', 'enrolled_on' => today()]
             );

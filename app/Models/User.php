@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use App\Services\PermissionResolver;
 
 class User extends Authenticatable
 {
@@ -83,15 +84,24 @@ class User extends Authenticatable
     }
 
     /**
-     * Kiểm tra user có permission hay không.
+     * Get the permission slugs that can satisfy a permission check.
+     *
+     * A resource manage permission covers the four standard CRUD actions,
+     * but those actions never imply manage.
+     *
+     * @return list<string>
+     */
+    public static function permissionCandidates(string $permission): array
+    {
+        return PermissionResolver::candidates($permission);
+    }
+
+    /**
+     * Check whether any assigned role grants the requested permission.
      */
     public function hasPermission(string $permission): bool
     {
-        return $this->roles()
-            ->whereHas('permissions', function ($query) use ($permission) {
-                $query->where('slug', $permission);
-            })
-            ->exists();
+        return app(PermissionResolver::class)->userHas($this, $permission);
     }
 
     /**
@@ -99,12 +109,6 @@ class User extends Authenticatable
      */
     public function permissionSlugs(): Collection
     {
-        return $this->roles()
-            ->with('permissions:id,slug')
-            ->get()
-            ->flatMap(fn (Role $role) => $role->permissions->pluck('slug'))
-            ->filter()
-            ->unique()
-            ->values();
+        return app(PermissionResolver::class)->userSlugs($this);
     }
 }

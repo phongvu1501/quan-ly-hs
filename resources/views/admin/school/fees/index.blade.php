@@ -4,9 +4,11 @@
         <div>
             <p class="eyebrow">Tài chính học sinh</p>
             <h1>Thông báo học phí</h1>
-            <p class="text-secondary mb-0">Theo dõi khoản phải đóng theo năm học, học kỳ hoặc lớp.</p>
-        </div><a href="{{ route('admin.school.fees.create') }}" class="btn btn-primary"
-            data-modal-title="Tạo thông báo học phí"><i data-lucide="plus"></i> Tạo khoản thu</a>
+            <p class="text-secondary mb-0">Khoản thu legacy; không tính trong báo cáo finance assessment mới.</p>
+        </div>
+        @if (auth()->user()->hasPermission('fees.generate'))
+            <a href="{{ route('admin.finance.fees.generate.create') }}" class="btn btn-primary"><i data-lucide="plus"></i> Phát sinh học phí mới</a>
+        @endif
     </div>
     <div class="card filter-card mb-4"><div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-3 mb-3"><div><strong>Bộ lọc khoản thu</strong><small class="d-block text-secondary">Lọc theo năm học, học kỳ, lớp và trạng thái thu.</small></div><a class="btn btn-sm btn-light" href="{{ route('admin.school.fees.index') }}" title="Đặt lại bộ lọc"><i data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a></div>
@@ -24,7 +26,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Khoản thu</th>
+                        <th>Khoản thu legacy</th>
                         <th>Số tiền</th>
                         <th>Hạn đóng</th>
                         <th>Đã ghi nhận</th>
@@ -37,6 +39,7 @@
                         <tr>
                             <td><strong>{{ $fee->title }}</strong><small
                                     class="d-block text-secondary">{{ \Illuminate\Support\Str::limit($fee->description, 80) }}</small>
+                                @if($fee->isLegacy())<span class="badge text-bg-warning mt-1">Legacy / Data warning</span>@endif
                             </td>
                             <td>{{ number_format((float) $fee->amount, 0, ',', '.') }} đ</td>
                             <td>{{ $fee->due_on?->format('d/m/Y') ?: '-' }}</td>
@@ -45,13 +48,17 @@
                                     class="status-dot {{ $fee->is_active ? 'status-on' : 'status-off' }}">{{ $fee->is_active ? 'Đang thu' : 'Đã khóa' }}</span>
                             </td>
                             <td class="text-end">
-                                <a href="{{ route('admin.school.fees.edit', $fee) }}"
-                                    class="btn btn-sm btn-light" data-modal-title="Sửa khoản thu" title="Sửa"><i
-                                        data-lucide="pencil"></i></a>
-                                <form action="{{ route('admin.school.fees.destroy', $fee) }}" method="POST"
-                                    data-modal-title="Xóa khoản thu" data-confirm="Xóa thông báo học phí này?">@csrf
-                                    @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="Xóa"><i
-                                            data-lucide="trash-2"></i></button></form>
+                                @if (! $fee->isLegacy() && auth()->user()->hasPermission('fees.edit'))
+                                    <a href="{{ route('admin.school.fees.edit', $fee) }}"
+                                        class="btn btn-sm btn-light" data-modal-title="Sửa khoản thu" title="Sửa"><i
+                                            data-lucide="pencil"></i></a>
+                                @endif
+                                @if (! $fee->isLegacy() && auth()->user()->hasPermission('fees.delete'))
+                                    <form action="{{ route('admin.school.fees.destroy', $fee) }}" method="POST"
+                                        data-modal-title="Xóa khoản thu" data-confirm="Xóa thông báo học phí này?">@csrf
+                                        @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="Xóa"><i
+                                                data-lucide="trash-2"></i></button></form>
+                                @endif
                             </td>
                     </tr>@empty<tr>
                             <td colspan="6" class="empty-state">Chưa có khoản thu.</td>

@@ -52,7 +52,7 @@
                         </select></div>
                     <div class="col-md-4"><label class="form-label">Trạng thái</label><select name="status"
                             class="form-select" required>
-                            @foreach (['active' => 'Đang công tác', 'on_leave' => 'Tạm nghỉ', 'inactive' => 'Ngừng công tác'] as $value => $label)
+                            @foreach (\App\Models\Teacher::STATUS_LABELS as $value => $label)
                                 <option value="{{ $value }}" @selected(old('status', $teacher?->status ?: 'active') === $value)>{{ $label }}
                                 </option>
                             @endforeach

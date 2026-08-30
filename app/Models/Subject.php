@@ -18,4 +18,6 @@ class Subject extends Model
     public function assignments(): HasMany { return $this->hasMany(TeachingAssignment::class); }
     public function teachers(): BelongsToMany { return $this->belongsToMany(Teacher::class, 'teacher_subject')->withPivot(['academic_year_id', 'is_primary'])->withTimestamps(); }
     public function schedules(): HasMany { return $this->hasMany(Schedule::class); }
+    public function salaryConfigs(): HasMany { return $this->hasMany(TeacherSalaryConfig::class); }
+    public function teachingExtraRecords(): HasMany { return $this->hasMany(TeachingExtraRecord::class); }
 }

@@ -383,10 +383,12 @@
             <p class="text-secondary mb-0">Mỗi lớp có một bảng riêng để theo dõi môn, giáo viên và phòng học theo từng tiết.
             </p>
         </div>
-        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#scheduleEditorModal"
-            data-schedule-mode="create">
-            <i data-lucide="calendar-plus"></i> Xếp tiết học
-        </button>
+        @if (auth()->user()->hasPermission('schedules.create'))
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#scheduleEditorModal"
+                data-schedule-mode="create">
+                <i data-lucide="calendar-plus"></i> Xếp tiết học
+            </button>
+        @endif
     </div>
 
     <div class="schedule-filter-card">
@@ -482,24 +484,32 @@
                                     @endphp
                                     <td>
                                         @if ($item)
-                                            <button type="button"
-                                                class="schedule-slot schedule-slot-edit tone-{{ $item->subject_id % 5 }}"
-                                                data-bs-toggle="modal" data-bs-target="#scheduleEditorModal"
-                                                data-schedule-mode="edit" data-schedule-id="{{ $item->id }}"
-                                                data-semester-id="{{ $item->semester_id }}"
-                                                data-class-id="{{ $item->class_id }}"
-                                                data-subject-id="{{ $item->subject_id }}"
-                                                data-teacher-id="{{ $item->teacher_id }}"
-                                                data-weekday="{{ $item->weekday }}" data-period="{{ $item->period }}"
-                                                data-room="{{ $item->room }}" data-notes="{{ $item->notes }}"
-                                                title="Sửa tiết học">
+                                            @if (auth()->user()->hasPermission('schedules.edit'))
+                                                <button type="button"
+                                                    class="schedule-slot schedule-slot-edit tone-{{ $item->subject_id % 5 }}"
+                                                    data-bs-toggle="modal" data-bs-target="#scheduleEditorModal"
+                                                    data-schedule-mode="edit" data-schedule-id="{{ $item->id }}"
+                                                    data-semester-id="{{ $item->semester_id }}"
+                                                    data-class-id="{{ $item->class_id }}"
+                                                    data-subject-id="{{ $item->subject_id }}"
+                                                    data-teacher-id="{{ $item->teacher_id }}"
+                                                    data-weekday="{{ $item->weekday }}" data-period="{{ $item->period }}"
+                                                    data-room="{{ $item->room }}" data-notes="{{ $item->notes }}"
+                                                    title="Sửa tiết học">
+                                            @else
+                                                <div class="schedule-slot tone-{{ $item->subject_id % 5 }}">
+                                            @endif
                                                 <strong
                                                     title="{{ $item->subject?->name }}">{{ $item->subject?->short_name ?: $item->subject?->name }}</strong>
                                                 <span
                                                     title="{{ $item->teacher?->full_name }}">{{ $item->teacher?->full_name ?: 'Chưa phân công GV' }}</span>
                                                 <small>{{ $item->room ?: 'Chưa có phòng' }}</small>
-                                            </button>
-                                        @else
+                                            @if (auth()->user()->hasPermission('schedules.edit'))
+                                                </button>
+                                            @else
+                                                </div>
+                                            @endif
+                                        @elseif (auth()->user()->hasPermission('schedules.create'))
                                             <button type="button" class="schedule-add-slot" data-bs-toggle="modal"
                                                 data-bs-target="#scheduleEditorModal" data-schedule-mode="create"
                                                 data-class-id="{{ $schoolClass->id }}"
@@ -524,8 +534,9 @@
         </div>
     @endforelse
 
-    <div class="modal fade schedule-editor-modal" id="scheduleEditorModal" tabindex="-1"
-        aria-labelledby="scheduleEditorTitle" aria-hidden="true">
+    @if (auth()->user()->hasPermission('schedules.create') || auth()->user()->hasPermission('schedules.edit'))
+        <div class="modal fade schedule-editor-modal" id="scheduleEditorModal" tabindex="-1"
+            aria-labelledby="scheduleEditorTitle" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -612,19 +623,22 @@
                     </div>
                 </form>
                 <div class="modal-footer">
-                    <form id="scheduleDeleteForm" class="delete-form d-none" method="POST" data-native-delete>
-                        @csrf
-                        @method('DELETE')
-                        <button class="btn btn-outline-danger" type="submit"><i data-lucide="trash-2"></i> Xóa
-                            tiết</button>
-                    </form>
+                    @if (auth()->user()->hasPermission('schedules.delete'))
+                        <form id="scheduleDeleteForm" class="delete-form d-none" method="POST" data-native-delete>
+                            @csrf
+                            @method('DELETE')
+                            <button class="btn btn-outline-danger" type="submit"><i data-lucide="trash-2"></i> Xóa
+                                tiết</button>
+                        </form>
+                    @endif
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
                     <button type="submit" class="btn btn-primary" form="scheduleEditorForm"><i data-lucide="save"></i>
                         Lưu tiết học</button>
                 </div>
             </div>
         </div>
-    </div>
+        </div>
+    @endif
 
     @push('scripts')
         <script>
@@ -636,7 +650,7 @@
                 const deleteForm = document.getElementById('scheduleDeleteForm');
                 const subject = document.getElementById('scheduleEditorSubject');
                 const teacher = document.getElementById('scheduleEditorTeacher');
-                if (!modal || !editor || !title || !method || !deleteForm || !subject || !teacher) return;
+                if (!modal || !editor || !title || !method || !subject || !teacher) return;
 
                 const storeUrl = @json(route('admin.school.schedules.store'));
                 const updateUrl = @json(route('admin.school.schedules.update', ['schedule' => '__SCHEDULE__']));
@@ -679,13 +693,15 @@
                         title.textContent = 'Sửa tiết học';
                         editor.action = updateUrl.replace('__SCHEDULE__', trigger.dataset.scheduleId);
                         method.disabled = false;
-                        deleteForm.action = deleteUrl.replace('__SCHEDULE__', trigger.dataset.scheduleId);
-                        deleteForm.classList.remove('d-none');
+                        if (deleteForm) {
+                            deleteForm.action = deleteUrl.replace('__SCHEDULE__', trigger.dataset.scheduleId);
+                            deleteForm.classList.remove('d-none');
+                        }
                     } else {
                         title.textContent = 'Xếp tiết học';
                         editor.action = storeUrl;
                         method.disabled = true;
-                        deleteForm.classList.add('d-none');
+                        deleteForm?.classList.add('d-none');
                         deleteForm.removeAttribute('action');
                     }
                 };

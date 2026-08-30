@@ -69,12 +69,14 @@
                         {{ ($attendance['late'] ?? collect())->count() }} đi muộn</p>
                 </div>
             @endif
-            @if (!$section && auth()->user()->hasPermission('fees.view'))
+            @if (!$section && auth()->user()->hasPermission('student-fees.view'))
                 <a class="overview-item text-decoration-none" href="{{ route('student.payments') }}"><span
                         class="overview-icon"><i data-lucide="wallet-cards"></i></span>
                     <h2>Học phí cần đóng</h2>
                     <p class="fs-3 fw-bold text-dark mb-0">
-                        {{ $fees->filter(fn($fee) => $fee->payments->first()?->status !== 'paid')->count() }}</p>
+                        {{ $feeAssessments->isNotEmpty()
+                            ? $feeAssessments->where('remaining_amount', '>', 0)->count()
+                            : $fees->filter(fn($fee) => $fee->payments->first()?->status !== 'paid')->count() }}</p>
                     <p>Xem chi tiết các khoản thu</p>
                 </a>
             @endif

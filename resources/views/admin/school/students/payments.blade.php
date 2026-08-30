@@ -8,12 +8,16 @@
             <p class="eyebrow">Tài chính học sinh</p>
             <h1>{{ $student->full_name }}</h1>
             <p class="text-secondary mb-0">{{ $student->student_code }} · Lịch sử đóng tiền qua các năm học</p>
-        </div><a href="{{ route('admin.school.students.index') }}" class="btn btn-light"><i data-lucide="arrow-left"></i> Danh
-            sách học sinh</a>
+        </div>
+        @if (auth()->user()->hasPermission('students.view'))
+            <a href="{{ route('admin.school.students.index') }}" class="btn btn-light"><i data-lucide="arrow-left"></i> Danh
+                sách học sinh</a>
+        @endif
     </div>
     <div class="row g-4">
-        <div class="col-xl-4">
-            <div class="card form-card">
+        @if (! $legacyReadOnly && auth()->user()->hasPermission('fees.create'))
+            <div class="col-xl-4">
+                <div class="card form-card">
                 <div class="card-body">
                     <div class="section-label">Cập nhật khoản đóng</div>
                     <form action="{{ route('admin.school.students.payments.store', $student) }}" method="POST">@csrf
@@ -49,12 +53,13 @@
                         <button class="btn btn-primary w-100"><i data-lucide="save"></i> Lưu khoản đóng</button>
                     </form>
                 </div>
+                </div>
             </div>
-        </div>
-        <div class="col-xl-8">
+        @endif
+        <div class="{{ ! $legacyReadOnly && auth()->user()->hasPermission('fees.create') ? 'col-xl-8' : 'col-12' }}">
             <div class="card table-card">
                 <div class="card-body border-bottom d-flex justify-content-between">
-                    <h2 class="panel-title mb-0">Lịch sử giao dịch</h2>
+                    <h2 class="panel-title mb-0">Lịch sử giao dịch legacy</h2>
                     <strong>{{ number_format((float) $student->payments->where('status', 'paid')->sum('amount'), 0, ',', '.') }}
                         đ đã đóng</strong>
                 </div>
@@ -80,6 +85,7 @@
                                     <td>{{ number_format((float) $payment->amount, 0, ',', '.') }} đ</td>
                                     <td><span
                                             class="status-dot {{ $payment->status === 'paid' ? 'status-on' : 'status-off' }}">{{ ['paid' => 'Đã thanh toán', 'pending' => 'Chờ xác nhận', 'unpaid' => 'Chưa thanh toán', 'refunded' => 'Đã hoàn tiền'][$payment->status] ?? $payment->status }}</span>
+                                        <span class="badge text-bg-warning d-block mt-1">Legacy / Data warning</span>
                                     </td>
                             </tr>@empty<tr>
                                     <td colspan="6" class="empty-state">Học sinh chưa có giao dịch.</td>
@@ -95,6 +101,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             const notice = document.getElementById('fee_notice_id');
             const amount = document.getElementById('amount');
+            if (!notice || !amount) return;
             notice.addEventListener('change', function() {
                 const selected = notice.selectedOptions[0];
                 if (selected?.dataset.amount) amount.value = Math.round(Number(selected.dataset.amount));

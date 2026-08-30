@@ -5,8 +5,11 @@
             <p class="eyebrow">Tổ chức lớp</p>
             <h1>Lớp học</h1>
             <p class="text-secondary mb-0">Lớp được quản lý theo từng năm học, khối và giáo viên chủ nhiệm.</p>
-        </div><a href="{{ route('admin.school.classes.create') }}" class="btn btn-primary" data-modal-title="Thêm lớp học"><i
-                data-lucide="plus"></i> Thêm lớp học</a>
+        </div>
+        @if (auth()->user()->hasPermission('classes.create'))
+            <a href="{{ route('admin.school.classes.create') }}" class="btn btn-primary" data-modal-title="Thêm lớp học"><i
+                    data-lucide="plus"></i> Thêm lớp học</a>
+        @endif
     </div>
     <div class="card filter-card mb-4"><div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-3 mb-3"><div><strong>Bộ lọc lớp học</strong><small class="d-block text-secondary">Lọc theo năm học, khối và trạng thái.</small></div><a class="btn btn-sm btn-light" href="{{ route('admin.school.classes.index') }}" title="Đặt lại bộ lọc"><i data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a></div>
@@ -42,14 +45,19 @@
                             <td>{{ $class->homeroomTeacher?->full_name ?: 'Chưa phân công' }}</td>
                             <td>{{ $class->enrollments_count }} / {{ $class->capacity }}</td>
                             <td>{{ $class->room ?: '-' }}</td>
-                            <td class="text-end"><a href="{{ route('admin.school.classes.edit', $class) }}"
-                                    class="btn btn-sm btn-light" data-modal-title="Sửa lớp học" title="Sửa"><i
-                                        data-lucide="pencil"></i></a>
-                                <form action="{{ route('admin.school.classes.destroy', $class) }}" method="POST"
-                                    class="d-inline" data-modal-title="Xóa lớp học"
-                                    data-confirm="Lớp có học sinh sẽ không thể xóa.">@csrf @method('DELETE')<button
-                                        class="btn btn-sm btn-outline-danger" title="Xóa"><i
-                                            data-lucide="trash-2"></i></button></form>
+                            <td class="text-end">
+                                @if (auth()->user()->hasPermission('classes.edit'))
+                                    <a href="{{ route('admin.school.classes.edit', $class) }}"
+                                        class="btn btn-sm btn-light" data-modal-title="Sửa lớp học" title="Sửa"><i
+                                            data-lucide="pencil"></i></a>
+                                @endif
+                                @if (auth()->user()->hasPermission('classes.delete'))
+                                    <form action="{{ route('admin.school.classes.destroy', $class) }}" method="POST"
+                                        class="d-inline" data-modal-title="Xóa lớp học"
+                                        data-confirm="Lớp có học sinh sẽ không thể xóa.">@csrf @method('DELETE')<button
+                                            class="btn btn-sm btn-outline-danger" title="Xóa"><i
+                                                data-lucide="trash-2"></i></button></form>
+                                @endif
                             </td>
                     </tr>@empty<tr>
                             <td colspan="7" class="empty-state">Chưa có lớp học.</td>

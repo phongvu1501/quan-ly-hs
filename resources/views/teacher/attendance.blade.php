@@ -2,6 +2,14 @@
 
 @section('title', 'Điểm danh lớp')
 
+@php
+    $canCreateAttendance = auth()->user()->hasPermission('attendance.create');
+    $canEditAttendance = auth()->user()->hasPermission('attendance.edit');
+    $hasMissingAttendance = $students->contains(
+        fn ($enrollment) => ! isset($records[$enrollment->student_id])
+    );
+@endphp
+
 @section('content')
     <div class="page-heading page-heading-inline">
         <div>
@@ -19,8 +27,10 @@
         </form>
     </div>
     @if ($class)
-        <form action="{{ route('teacher.attendance.store') }}" method="POST">@csrf<input type="hidden" name="class_id"
-                value="{{ $class->id }}"><input type="hidden" name="attended_on" value="{{ $date->format('Y-m-d') }}">
+        @if ($canCreateAttendance && $hasMissingAttendance)
+            <form action="{{ route('teacher.attendance.store') }}" method="POST">@csrf<input type="hidden" name="class_id"
+                    value="{{ $class->id }}"><input type="hidden" name="attended_on" value="{{ $date->format('Y-m-d') }}">
+        @endif
             <div class="card table-card">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
@@ -38,13 +48,18 @@
                                     <td><strong>{{ $enrollment->student?->full_name }}</strong><small
                                             class="d-block text-secondary">{{ $enrollment->student?->student_code }}</small>
                                     </td>
-                                    <td><div class="d-flex align-items-center gap-2"><select name="statuses[{{ $enrollment->student_id }}]" class="form-select">
-                                            <option value="present" @selected(($record?->status ?? 'present') === 'present')>Có mặt</option>
-                                            <option value="absent" @selected($record?->status === 'absent')>Vắng</option>
-                                            <option value="late" @selected($record?->status === 'late')>Đi muộn</option>
-                                            <option value="excused" @selected($record?->status === 'excused')>Nghỉ có phép</option>
-                                        </select>
-                                        @if ($record)
+                                    <td><div class="d-flex align-items-center gap-2">
+                                        @if (! $record && $canCreateAttendance)
+                                            <select name="statuses[{{ $enrollment->student_id }}]" class="form-select">
+                                                <option value="present">Có mặt</option>
+                                                <option value="absent">Vắng</option>
+                                                <option value="late">Đi muộn</option>
+                                                <option value="excused">Nghỉ có phép</option>
+                                            </select>
+                                        @else
+                                            <span>{{ ['present' => 'Có mặt', 'absent' => 'Vắng', 'late' => 'Đi muộn', 'excused' => 'Nghỉ có phép'][$record?->status] ?? 'Chưa điểm danh' }}</span>
+                                        @endif
+                                        @if ($record && $canEditAttendance)
                                             <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal"
                                                 data-bs-target="#attendanceEditModal" data-attendance-id="{{ $record->id }}"
                                                 data-attendance-date="{{ $record->attended_on?->format('Y-m-d') }}"
@@ -52,8 +67,13 @@
                                                 title="Sửa điểm danh"><i data-lucide="pencil"></i><span class="visually-hidden">Sửa điểm danh</span></button>
                                         @endif
                                     </div></td>
-                                    <td><input name="reasons[{{ $enrollment->student_id }}]" class="form-control"
-                                            value="{{ $record?->reason }}"></td>
+                                    <td>
+                                        @if (! $record && $canCreateAttendance)
+                                            <input name="reasons[{{ $enrollment->student_id }}]" class="form-control">
+                                        @else
+                                            {{ $record?->reason ?: '-' }}
+                                        @endif
+                                    </td>
                             </tr>@empty<tr>
                                     <td colspan="3" class="empty-state">Lớp chưa có học sinh.</td>
                                 </tr>
@@ -61,12 +81,17 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="p-3 border-top text-end"><button class="btn btn-primary"><i data-lucide="save"></i> Lưu điểm
-                        danh</button></div>
+                @if ($canCreateAttendance && $hasMissingAttendance)
+                    <div class="p-3 border-top text-end"><button class="btn btn-primary"><i data-lucide="save"></i> Lưu điểm
+                            danh</button></div>
+                @endif
             </div>
-        </form>
+        @if ($canCreateAttendance && $hasMissingAttendance)
+            </form>
+        @endif
 
-        <div class="modal fade" id="attendanceEditModal" tabindex="-1" aria-labelledby="attendanceEditTitle" aria-hidden="true">
+        @if ($canEditAttendance)
+            <div class="modal fade" id="attendanceEditModal" tabindex="-1" aria-labelledby="attendanceEditTitle" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -87,7 +112,8 @@
                     </form>
                 </div>
             </div>
-        </div>
+            </div>
+        @endif
     @else
         <div class="card">
             <div class="empty-state">Tài khoản chưa có lớp để điểm danh.</div>

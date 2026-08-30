@@ -1108,7 +1108,7 @@
             @php
                 $sidebarMenus = app(\App\Services\MenuService::class)->forUser(auth()->user());
                 $sidebarGrades =
-                    auth()->user()->hasPermission('grades.manage') || auth()->user()->hasPermission('classes.manage')
+                    auth()->user()->hasPermission('grades.view') || auth()->user()->hasPermission('classes.view')
                         ? \App\Models\Grade::with([
                             'classes' => fn($query) => $query
                                 ->where('status', 'active')
@@ -1121,6 +1121,36 @@
                 $activeSidebarClass = request()->route('schoolClass');
                 $activeSidebarGradeId =
                     $activeSidebarClass instanceof \App\Models\SchoolClass ? $activeSidebarClass->grade_id : null;
+                $schoolViewPermissions = [
+                    'students.view',
+                    'teachers.view',
+                    'grades.view',
+                    'subjects.view',
+                    'classes.view',
+                    'assignments.view',
+                    'scores.view',
+                    'attendance.view',
+                    'schedules.view',
+                    'exams.view',
+                    'exam-invigilations.view',
+                    'announcements.view',
+                    'fees.view',
+                ];
+                $canViewSchoolNavigation =
+                    auth()->user()->hasPermission('school.dashboard') ||
+                    collect($schoolViewPermissions)->contains(
+                        fn($permission) => auth()->user()->hasPermission($permission),
+                    );
+                $dashboardUrl = app(\App\Http\Controllers\AuthController::class)->dashboardUrl(auth()->user());
+                $dashboardLabel = match (true) {
+                    auth()->user()->hasPermission('school.dashboard') => 'Tổng quan nhà trường',
+                    auth()->user()->hasPermission('finance.dashboard') => 'Tổng quan tài chính',
+                    auth()->user()->teacherProfile && auth()->user()->hasPermission('teacher.dashboard')
+                        => 'Cổng giáo viên',
+                    auth()->user()->studentProfile && auth()->user()->hasPermission('student.dashboard')
+                        => 'Cổng học sinh',
+                    default => 'Trang chính',
+                };
             @endphp
 
             <a class="brand" href="{{ route('dashboard') }}">
@@ -1156,46 +1186,53 @@
                  DASHBOARD
                  ================================================== --}}
 
-                <a href="{{ route('dashboard') }}" @class([
-                    'active' => request()->routeIs('dashboard', 'admin.dashboard'),
+                <a href="{{ $dashboardUrl }}" @class([
+                    'active' => request()->routeIs(
+                        'dashboard',
+                        'admin.dashboard',
+                        'admin.school.dashboard',
+                        'admin.finance.dashboard',
+                        'teacher.homeroom.dashboard',
+                        'teacher.subject.dashboard',
+                        'student.dashboard'),
                 ])>
 
                     <i data-lucide="layout-dashboard"></i>
 
                     <span>
-                        Tổng quan
+                        {{ $dashboardLabel }}
                     </span>
 
                 </a>
 
                 <div class="nav-divider"></div>
 
-                @if (auth()->user()->hasPermission('users.manage'))
+                @if (auth()->user()->hasPermission('users.view'))
                     <a href="{{ route('admin.users.index') }}" @class(['active' => request()->routeIs('admin.users.*')])>
                         <i data-lucide="users"></i>
                         <span>Tài khoản</span>
                     </a>
                 @endif
 
-                @if (auth()->user()->hasPermission('roles.manage'))
+                @if (auth()->user()->hasPermission('roles.view'))
                     <a href="{{ route('admin.roles.index') }}" @class(['active' => request()->routeIs('admin.roles.*')])>
                         <i data-lucide="shield-check"></i><span>Vai trò</span>
                     </a>
                 @endif
 
-                @if (auth()->user()->hasPermission('permissions.manage'))
+                @if (auth()->user()->hasPermission('permissions.view'))
                     <a href="{{ route('admin.permissions.index') }}" @class(['active' => request()->routeIs('admin.permissions.*')])>
                         <i data-lucide="key-round"></i><span>Quyền truy cập</span>
                     </a>
                 @endif
 
-                @if (auth()->user()->hasPermission('menus.manage'))
+                @if (auth()->user()->hasPermission('menus.view'))
                     <a href="{{ route('admin.menus.index') }}" @class(['active' => request()->routeIs('admin.menus.*')])>
                         <i data-lucide="list-tree"></i><span>Điều hướng</span>
                     </a>
                 @endif
 
-                @if (auth()->user()->hasPermission('school.dashboard'))
+                @if ($canViewSchoolNavigation)
                     <div class="nav-divider"></div>
                     <details class="nav-group" data-sidebar-key="school" @if (request()->routeIs('admin.school.*')) open @endif>
                         <summary class="nav-group-toggle">
@@ -1205,11 +1242,11 @@
                         <div class="nav-children">
                             <div class="nav-cluster">
                                 <span class="nav-cluster-label">Danh bạ &amp; lớp học</span>
-                                @if (auth()->user()->hasPermission('students.manage'))
+                                @if (auth()->user()->hasPermission('students.view'))
                                     <a href="{{ route('admin.school.students.index') }}" @class(['active' => request()->routeIs('admin.school.students.*')])><i
                                             data-lucide="graduation-cap"></i><span>Học sinh</span></a>
                                 @endif
-                                @if (auth()->user()->hasPermission('teachers.manage'))
+                                @if (auth()->user()->hasPermission('teachers.view'))
                                     <details class="nav-group nav-group-nested" data-sidebar-key="school-teachers"
                                         @if (request()->routeIs('admin.school.teachers.*')) open @endif>
                                         <summary class="nav-group-toggle"><span class="nav-item-label"><i
@@ -1234,7 +1271,7 @@
                                         </div>
                                     </details>
                                 @endif
-                                @if (auth()->user()->hasPermission('grades.manage') || auth()->user()->hasPermission('classes.manage'))
+                                @if (auth()->user()->hasPermission('grades.view') || auth()->user()->hasPermission('classes.view'))
                                     <details class="nav-group nav-group-nested" data-sidebar-key="school-grades"
                                         @if (request()->routeIs('admin.school.grades.*', 'admin.school.classes.*')) open @endif>
                                         <summary class="nav-group-toggle"><span class="nav-item-label"><i
@@ -1251,7 +1288,7 @@
                                                             data-lucide="chevron-right" class="nav-chevron"></i>
                                                     </summary>
                                                     <div class="nav-children">
-                                                        @if (auth()->user()->hasPermission('classes.manage'))
+                                                        @if (auth()->user()->hasPermission('classes.view'))
                                                             @foreach ($grade->classes as $gradeClass)
                                                                 <a href="{{ route('admin.school.classes.students', $gradeClass) }}"
                                                                     @class([
@@ -1266,7 +1303,7 @@
                                                     </div>
                                                 </details>
                                             @endforeach
-                                            @if (auth()->user()->hasPermission('classes.manage'))
+                                            @if (auth()->user()->hasPermission('classes.view'))
                                                 <a href="{{ route('admin.school.classes.index') }}"
                                                     @class([
                                                         'active' =>
@@ -1281,33 +1318,35 @@
                             </div>
                             <div class="nav-cluster">
                                 <span class="nav-cluster-label">Học vụ</span>
-                                @if (auth()->user()->hasPermission('subjects.manage'))
+                                @if (auth()->user()->hasPermission('subjects.view'))
                                     <a href="{{ route('admin.school.subjects.index') }}"
                                         @class(['active' => request()->routeIs('admin.school.subjects.*')])><i data-lucide="book-open"></i><span>Môn
                                             học</span></a>
                                 @endif
-                                @if (auth()->user()->hasPermission('assignments.manage'))
+                                @if (auth()->user()->hasPermission('assignments.view'))
                                     <a href="{{ route('admin.school.assignments.index') }}"
                                         @class(['active' => request()->routeIs('admin.school.assignments.*')])><i data-lucide="network"></i><span>Phân công giáo
                                             viên</span></a>
                                 @endif
-                                @if (auth()->user()->hasPermission('schedules.manage'))
+                                @if (auth()->user()->hasPermission('schedules.view'))
                                     <a href="{{ route('admin.school.schedules.index') }}"
                                         @class(['active' => request()->routeIs('admin.school.schedules.*')])><i data-lucide="calendar-days"></i><span>Thời khóa
                                             biểu</span></a>
                                 @endif
-                                @if (auth()->user()->hasPermission('attendance.manage'))
+                                @if (auth()->user()->hasPermission('attendance.view'))
                                     <a href="{{ route('admin.school.attendance.index') }}"
                                         @class(['active' => request()->routeIs('admin.school.attendance.*')])><i data-lucide="clipboard-check"></i><span>Điểm
                                             danh</span></a>
                                 @endif
-                                @if (auth()->user()->hasPermission('scores.manage'))
+                                @if (auth()->user()->hasPermission('scores.view'))
                                     <a href="{{ route('admin.school.scores.index') }}" @class(['active' => request()->routeIs('admin.school.scores.*')])><i
                                             data-lucide="sigma"></i><span>Quản lý điểm</span></a>
                                 @endif
-                                @if (auth()->user()->hasPermission('exams.manage'))
+                                @if (auth()->user()->hasPermission('exams.view'))
                                     <a href="{{ route('admin.school.exams.index') }}" @class(['active' => request()->routeIs('admin.school.exams.*')])><i
                                             data-lucide="file-clock"></i><span>Lịch thi</span></a>
+                                @endif
+                                @if (auth()->user()->hasPermission('exam-invigilations.view'))
                                     <a href="{{ route('admin.school.exam-invigilations.index') }}"
                                         @class([
                                             'active' => request()->routeIs('admin.school.exam-invigilations.*'),
@@ -1317,14 +1356,14 @@
                             </div>
                             <div class="nav-cluster">
                                 <span class="nav-cluster-label">Thông tin &amp; tài chính</span>
-                                @if (auth()->user()->hasPermission('announcements.manage'))
+                                @if (auth()->user()->hasPermission('announcements.view'))
                                     <a href="{{ route('admin.school.announcements.index') }}"
                                         @class([
                                             'active' => request()->routeIs('admin.school.announcements.*'),
                                         ])><i data-lucide="megaphone"></i><span>Thông báo nhà
                                             trường</span></a>
                                 @endif
-                                @if (auth()->user()->hasPermission('fees.manage'))
+                                @if (auth()->user()->hasPermission('fees.view'))
                                     <a href="{{ route('admin.school.fees.index') }}" @class(['active' => request()->routeIs('admin.school.fees.*')])><i
                                             data-lucide="wallet-cards"></i><span>Khoản thu học phí</span></a>
                                 @endif
@@ -1333,10 +1372,131 @@
                     </details>
                 @endif
 
-                @if (auth()->user()->teacherProfile &&
-                        (auth()->user()->hasRole('teacher') ||
-                            auth()->user()->hasRole('homeroom_teacher') ||
-                            auth()->user()->hasRole('subject_teacher')))
+                @php
+                    $financeViewPermissions = [
+                        'finance.dashboard',
+                        'fees.view',
+                        'fee-categories.view',
+                        'fee-rates.view',
+                        'fee-policies.view',
+                        'student-fee-policies.view',
+                        'payrolls.view',
+                        'salary-components.view',
+                        'salary-configs.view',
+                        'payroll-inputs.view',
+                        'teaching-extra.view',
+                        'tax-configs.view',
+                        'insurance-configs.view',
+                        'fees.report',
+                        'payrolls.report',
+                    ];
+                    $canViewFinanceNavigation = collect($financeViewPermissions)->contains(
+                        fn($permission) => auth()->user()->hasPermission($permission),
+                    );
+                @endphp
+                @if ($canViewFinanceNavigation)
+                    <div class="nav-divider"></div>
+                    <details class="nav-group" data-sidebar-key="finance"
+                        @if (request()->routeIs('admin.finance.*')) open @endif>
+                        <summary class="nav-group-toggle"><span class="nav-item-label"><i
+                                    data-lucide="landmark"></i><span>Tài chính</span></span><i
+                                data-lucide="chevron-right" class="nav-chevron"></i></summary>
+                        <div class="nav-children">
+                            @if (auth()->user()->hasPermission('finance.dashboard'))
+                                <a href="{{ route('admin.finance.dashboard') }}" @class(['active' => request()->routeIs('admin.finance.dashboard')])><i
+                                        data-lucide="layout-dashboard"></i><span>Tổng quan</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('fees.view'))
+                                <a href="{{ route('admin.finance.fees.index') }}" @class(['active' => request()->routeIs('admin.finance.fees.*')])><i
+                                        data-lucide="receipt-text"></i><span>Công nợ học sinh</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('fee-categories.view'))
+                                <a href="{{ route('admin.finance.fee-categories.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.fee-categories.*'),
+                                    ])><i data-lucide="list-checks"></i><span>Khoản
+                                        thu</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('fee-rates.view'))
+                                <a href="{{ route('admin.finance.fee-rates.index') }}"
+                                    @class(['active' => request()->routeIs('admin.finance.fee-rates.*')])><i data-lucide="banknote"></i><span>Mức
+                                        thu</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('fee-policies.view'))
+                                <a href="{{ route('admin.finance.fee-policies.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.fee-policies.*'),
+                                    ])><i data-lucide="badge-percent"></i><span>Chính sách
+                                        miễn giảm</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('student-fee-policies.view'))
+                                <a href="{{ route('admin.finance.student-fee-policies.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.student-fee-policies.*'),
+                                    ])><i data-lucide="user-round-check"></i><span>Diện miễn
+                                        giảm</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('payrolls.view'))
+                                <a href="{{ route('admin.finance.payrolls.index') }}" @class(['active' => request()->routeIs('admin.finance.payrolls.*')])><i
+                                        data-lucide="badge-dollar-sign"></i><span>Bảng lương</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('salary-configs.view'))
+                                <a href="{{ route('admin.finance.salary-profiles.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.salary-profiles.*'),
+                                    ])><i data-lucide="settings-2"></i><span>Cấu hình
+                                        lương</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('salary-components.view'))
+                                <a href="{{ route('admin.finance.salary-components.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.salary-components.*'),
+                                    ])><i data-lucide="blocks"></i><span>Thành phần
+                                        lương</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('payroll-inputs.view'))
+                                <a href="{{ route('admin.finance.payroll-inputs.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.payroll-inputs.*'),
+                                    ])><i data-lucide="clipboard-plus"></i><span>Đầu vào
+                                        lương</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('teaching-extra.view'))
+                                <a href="{{ route('admin.finance.teaching-extra.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.teaching-extra.*'),
+                                    ])><i data-lucide="clock-plus"></i><span>Dạy
+                                        thêm</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('tax-configs.view'))
+                                <a href="{{ route('admin.finance.tax-configs.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.tax-configs.*'),
+                                    ])><i data-lucide="percent"></i><span>Thuế</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('insurance-configs.view'))
+                                <a href="{{ route('admin.finance.insurance-configs.index') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.insurance-configs.*'),
+                                    ])><i data-lucide="shield-plus"></i><span>Bảo
+                                        hiểm</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('fees.report'))
+                                <a href="{{ route('admin.finance.reports.fees') }}" @class(['active' => request()->routeIs('admin.finance.reports.fees')])><i
+                                        data-lucide="file-chart-column"></i><span>Báo cáo học phí</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('payrolls.report'))
+                                <a href="{{ route('admin.finance.reports.payroll') }}"
+                                    @class([
+                                        'active' => request()->routeIs('admin.finance.reports.payroll'),
+                                    ])><i
+                                        data-lucide="file-chart-column-increasing"></i><span>Báo cáo lương</span></a>
+                            @endif
+                        </div>
+                    </details>
+                @endif
+
+                @if (auth()->user()->teacherProfile && auth()->user()->hasPermission('teacher.dashboard'))
                     <div class="nav-divider"></div>
                     <details class="nav-group" data-sidebar-key="teacher"
                         @if (request()->routeIs('teacher.*')) open @endif>
@@ -1344,7 +1504,7 @@
                                     data-lucide="presentation"></i><span>Giáo viên</span></span><i
                                 data-lucide="chevron-right" class="nav-chevron"></i></summary>
                         <div class="nav-children">
-                            @if (auth()->user()->hasRole('homeroom_teacher'))
+                            @if (auth()->user()->hasPermission('homeroom.dashboard'))
                                 <a href="{{ route('teacher.homeroom.dashboard', ['section' => 'classes']) }}#classes"
                                     @class([
                                         'active' =>
@@ -1360,12 +1520,16 @@
                                         in_array(request()->get('section'), [null, 'assignments'], true),
                                 ])><i data-lucide="users-round"></i><span>Lớp bộ
                                     môn</span></a>
-                            <a href="{{ route('teacher.scores') }}" @class(['active' => request()->routeIs('teacher.scores')])><i
-                                    data-lucide="square-pen"></i><span>Nhập điểm</span></a>
-                            <a href="{{ route('teacher.comments') }}" @class(['active' => request()->routeIs('teacher.comments')])><i
-                                    data-lucide="message-square-text"></i><span>Nhận xét học sinh</span></a>
-                            <a href="{{ route('teacher.attendance') }}" @class(['active' => request()->routeIs('teacher.attendance')])><i
-                                    data-lucide="clipboard-check"></i><span>Điểm danh</span></a>
+                            @if (auth()->user()->hasPermission('scores.view'))
+                                <a href="{{ route('teacher.scores') }}" @class(['active' => request()->routeIs('teacher.scores')])><i
+                                        data-lucide="square-pen"></i><span>Nhập điểm</span></a>
+                                <a href="{{ route('teacher.comments') }}" @class(['active' => request()->routeIs('teacher.comments')])><i
+                                        data-lucide="message-square-text"></i><span>Nhận xét học sinh</span></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('attendance.view'))
+                                <a href="{{ route('teacher.attendance') }}" @class(['active' => request()->routeIs('teacher.attendance')])><i
+                                        data-lucide="clipboard-check"></i><span>Điểm danh</span></a>
+                            @endif
                             <a href="{{ route('teacher.subject.dashboard', ['section' => 'schedule']) }}#schedule"
                                 @class(['active' => request()->get('section') === 'schedule'])><i data-lucide="calendar-days"></i><span>Thời khóa
                                     biểu</span></a>
@@ -1377,7 +1541,7 @@
                     </details>
                 @endif
 
-                @if (auth()->user()->hasRole('student') && auth()->user()->studentProfile)
+                @if (auth()->user()->hasPermission('student.dashboard') && auth()->user()->studentProfile)
                     <div class="nav-divider"></div>
                     <details class="nav-group" data-sidebar-key="student"
                         @if (request()->routeIs('student.*')) open @endif>
@@ -1403,7 +1567,7 @@
                                 @class(['active' => request()->get('section') === 'announcements'])><i data-lucide="megaphone"></i><span>Thông báo</span></a>
                             <a href="{{ route('student.dashboard', ['section' => 'exams']) }}#exams"
                                 @class(['active' => request()->get('section') === 'exams'])><i data-lucide="file-clock"></i><span>Lịch thi</span></a>
-                            @if(auth()->user()->hasPermission('fees.view'))
+                            @if (auth()->user()->hasPermission('student-fees.view'))
                                 <a href="{{ route('student.payments') }}" @class(['active' => request()->routeIs('student.payments')])><i
                                         data-lucide="wallet-cards"></i><span>Học phí</span></a>
                             @endif
@@ -1545,6 +1709,11 @@
                             'admin.school.exam-invigilations.index' => 'Tìm theo giáo viên, kỳ thi hoặc phòng thi',
                             'admin.school.announcements.index' => 'Tìm theo tiêu đề, nội dung hoặc đối tượng',
                             'admin.school.fees.index' => 'Tìm theo tên khoản thu hoặc mô tả',
+                            'admin.finance.fees.index' => 'Tìm theo mã hoặc tên học sinh',
+                            'admin.finance.payrolls.index' => 'Tìm theo mã hoặc tên giáo viên',
+                            'admin.finance.fee-categories.index' => 'Tìm theo mã hoặc tên khoản thu',
+                            'admin.finance.fee-policies.index' => 'Tìm theo mã hoặc tên chính sách',
+                            'admin.finance.salary-components.index' => 'Tìm theo mã hoặc tên thành phần lương',
                         ];
                         $searchPlaceholder = collect($searchPlaceholders)->first(
                             fn($placeholder, $route) => request()->routeIs($route),
@@ -1584,7 +1753,7 @@
 
                         {{-- ROLES --}}
 
-                        @if (auth()->user()->hasPermission('roles.manage'))
+                        @if (auth()->user()->hasPermission('roles.view'))
                             <article class="overview-item">
 
                                 <a href="{{ route('admin.roles.index') }}">
@@ -1612,7 +1781,7 @@
 
                         {{-- USERS --}}
 
-                        @if (auth()->user()->hasPermission('users.manage'))
+                        @if (auth()->user()->hasPermission('users.view'))
                             <article class="overview-item">
 
                                 <a href="{{ route('admin.users.index') }}">
@@ -1633,7 +1802,7 @@
 
                         {{-- PERMISSIONS --}}
 
-                        @if (auth()->user()->hasPermission('permissions.manage'))
+                        @if (auth()->user()->hasPermission('permissions.view'))
                             <article class="overview-item">
 
                                 <a href="{{ route('admin.permissions.index') }}">
@@ -1661,7 +1830,7 @@
 
                         {{-- MENUS --}}
 
-                        @if (auth()->user()->hasPermission('menus.manage'))
+                        @if (auth()->user()->hasPermission('menus.view'))
                             <article class="overview-item">
 
                                 <a href="{{ route('admin.menus.index') }}">
@@ -1782,9 +1951,6 @@
     </div>
 
 
-    {{-- ==============================================================
-     RESOURCE MODAL
-     ============================================================== --}}
 
     <div class="modal fade" id="resourceModal" tabindex="-1" aria-labelledby="resourceModalTitle"
         aria-hidden="true">
@@ -1827,10 +1993,10 @@
 
     <script>
         /*
-        |--------------------------------------------------------------------------
-        | SIDEBAR MOBILE
-        |--------------------------------------------------------------------------
-        */
+            |--------------------------------------------------------------------------
+            | SIDEBAR MOBILE
+            |--------------------------------------------------------------------------
+            */
 
         const sidebar =
             document.getElementById('sidebar');
@@ -1852,8 +2018,7 @@
         const sidebarStorageKey = @json('admin-sidebar-state-' . auth()->id());
         const sidebarCollapseStorageKey = `${sidebarStorageKey}-collapsed`;
         const sidebarDetails = sidebar ?
-            Array.from(sidebar.querySelectorAll('details.nav-group')) :
-            [];
+            Array.from(sidebar.querySelectorAll('details.nav-group')) : [];
         let sidebarOpenState = {};
 
         try {
@@ -2095,7 +2260,7 @@
 
         document.querySelectorAll(
             '[data-modal-url], [data-modal-readonly], a[href$="/create"], a[href*="/edit"], a[href*="/history"], a[href*="/transcript"], a[href*="/payments"]'
-            ).forEach((link) => {
+        ).forEach((link) => {
             link.addEventListener('click', (event) => {
                 event.preventDefault();
                 const url = link.dataset.modalUrl || link.href;

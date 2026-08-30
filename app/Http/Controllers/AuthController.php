@@ -88,27 +88,27 @@ class AuthController extends Controller
     {
         $user ??= auth()->user();
 
-        if ($user->hasRole('admin') || $user->hasPermission('admin.access')) {
+        if ($user->hasPermission('school.dashboard')) {
             return route('admin.school.dashboard');
         }
 
-        if ($user->hasRole('homeroom_teacher') && $user->teacherProfile) {
+        if ($user->hasPermission('finance.dashboard')) {
+            return route('admin.finance.dashboard');
+        }
+
+        if ($user->teacherProfile && $user->hasPermission('homeroom.dashboard')) {
             return route('teacher.homeroom.dashboard');
         }
 
-        if ($user->hasRole('subject_teacher') && $user->teacherProfile) {
+        if ($user->teacherProfile && $user->hasPermission('teacher.dashboard')) {
             return route('teacher.subject.dashboard');
         }
 
-        if ($user->hasRole('teacher') && $user->teacherProfile) {
-            return route('teacher.subject.dashboard');
-        }
-
-        if ($user->hasRole('student') && $user->studentProfile) {
+        if ($user->studentProfile && $user->hasPermission('student.dashboard')) {
             return route('student.dashboard');
         }
 
-        if ($user->hasRole('homeroom_teacher') || $user->hasRole('subject_teacher') || $user->hasRole('teacher') || $user->hasRole('student')) {
+        if ($user->teacherProfile || $user->studentProfile) {
             return route('profile.show');
         }
 

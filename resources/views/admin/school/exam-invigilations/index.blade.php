@@ -9,7 +9,9 @@
             <h1>Phân công coi thi</h1>
             <p class="text-secondary mb-0">Phân công giáo viên theo từng kỳ thi, ngày và ca thi.</p>
         </div>
-        <a href="{{ route('admin.school.exam-invigilations.create') }}" class="btn btn-primary" data-modal-title="Thêm phân công coi thi"><i data-lucide="user-plus"></i> Phân công coi thi</a>
+        @if (auth()->user()->hasPermission('exam-invigilations.create'))
+            <a href="{{ route('admin.school.exam-invigilations.create') }}" class="btn btn-primary" data-modal-title="Thêm phân công coi thi"><i data-lucide="user-plus"></i> Phân công coi thi</a>
+        @endif
     </div>
 
     <div class="card filter-card mb-4"><div class="card-body">
@@ -35,7 +37,14 @@
                         <td><strong>{{ $assignment->teacher?->full_name }}</strong><small class="d-block text-secondary">{{ $assignment->teacher?->teacher_code }}</small></td>
                         <td>{{ $roles[$assignment->role] ?? $assignment->role }}</td>
                         <td>{{ $assignment->exam?->room ?: '-' }}</td>
-                        <td class="text-end"><a href="{{ route('admin.school.exam-invigilations.edit', $assignment) }}" class="btn btn-sm btn-light" data-modal-title="Sửa phân công coi thi" title="Sửa"><i data-lucide="pencil"></i></a><form action="{{ route('admin.school.exam-invigilations.destroy', $assignment) }}" method="POST" class="d-inline" data-modal-title="Xóa phân công coi thi" data-confirm="Xóa phân công coi thi này?">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="Xóa"><i data-lucide="trash-2"></i></button></form></td>
+                        <td class="text-end">
+                            @if (auth()->user()->hasPermission('exam-invigilations.edit'))
+                                <a href="{{ route('admin.school.exam-invigilations.edit', $assignment) }}" class="btn btn-sm btn-light" data-modal-title="Sửa phân công coi thi" title="Sửa"><i data-lucide="pencil"></i></a>
+                            @endif
+                            @if (auth()->user()->hasPermission('exam-invigilations.delete'))
+                                <form action="{{ route('admin.school.exam-invigilations.destroy', $assignment) }}" method="POST" class="d-inline" data-modal-title="Xóa phân công coi thi" data-confirm="Xóa phân công coi thi này?">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="Xóa"><i data-lucide="trash-2"></i></button></form>
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr><td colspan="7" class="empty-state">Chưa có phân công coi thi.</td></tr>

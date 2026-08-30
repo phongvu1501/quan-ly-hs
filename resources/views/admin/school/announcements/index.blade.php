@@ -5,8 +5,11 @@
             <p class="eyebrow">Truyền thông nhà trường</p>
             <h1>Thông báo</h1>
             <p class="text-secondary mb-0">Thông báo học tập, lịch học tuần tới, lịch thi và các khoản cần đóng.</p>
-        </div><a href="{{ route('admin.school.announcements.create') }}" class="btn btn-primary"
-            data-modal-title="Tạo thông báo"><i data-lucide="plus"></i> Tạo thông báo</a>
+        </div>
+        @if (auth()->user()->hasPermission('announcements.create'))
+            <a href="{{ route('admin.school.announcements.create') }}" class="btn btn-primary"
+                data-modal-title="Tạo thông báo"><i data-lucide="plus"></i> Tạo thông báo</a>
+        @endif
     </div>
     <div class="card filter-card mb-4"><div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-3 mb-3"><div><strong>Bộ lọc thông báo</strong><small class="d-block text-secondary">Lọc theo đối tượng, loại và trạng thái phát hành.</small></div><a class="btn btn-sm btn-light" href="{{ route('admin.school.announcements.index') }}" title="Đặt lại bộ lọc"><i data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a></div>
@@ -46,13 +49,17 @@
                                     class="status-dot {{ $announcement->is_published ? 'status-on' : 'status-off' }}">{{ $announcement->is_published ? 'Đã phát hành' : 'Bản nháp' }}</span>
                             </td>
                             <td class="text-end">
-                                <a href="{{ route('admin.school.announcements.edit', $announcement) }}"
-                                    class="btn btn-sm btn-light" data-modal-title="Sửa thông báo" title="Sửa"><i
-                                        data-lucide="pencil"></i></a>
-                                <form action="{{ route('admin.school.announcements.destroy', $announcement) }}"
-                                    method="POST" data-modal-title="Xóa thông báo" data-confirm="Xóa thông báo này?">@csrf
-                                    @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="Xóa"><i
-                                            data-lucide="trash-2"></i></button></form>
+                                @if (auth()->user()->hasPermission('announcements.edit'))
+                                    <a href="{{ route('admin.school.announcements.edit', $announcement) }}"
+                                        class="btn btn-sm btn-light" data-modal-title="Sửa thông báo" title="Sửa"><i
+                                            data-lucide="pencil"></i></a>
+                                @endif
+                                @if (auth()->user()->hasPermission('announcements.delete'))
+                                    <form action="{{ route('admin.school.announcements.destroy', $announcement) }}"
+                                        method="POST" data-modal-title="Xóa thông báo" data-confirm="Xóa thông báo này?">@csrf
+                                        @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="Xóa"><i
+                                                data-lucide="trash-2"></i></button></form>
+                                @endif
                             </td>
                     </tr>@empty<tr>
                             <td colspan="6" class="empty-state">Chưa có thông báo.</td>

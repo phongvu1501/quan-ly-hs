@@ -70,7 +70,7 @@ class SchoolBusinessRulesTest extends TestCase
         [$year, $semester, $classA, $classB] = $this->schoolContext();
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['slug' => 'student'], ['name' => 'Student']);
-        $permissions = collect(['student.dashboard', 'fees.view'])->map(fn (string $slug) =>
+        $permissions = collect(['student.dashboard', 'student-fees.view'])->map(fn (string $slug) =>
             Permission::firstOrCreate(['slug' => $slug], ['name' => $slug])
         );
         $role->permissions()->syncWithoutDetaching($permissions->pluck('id'));

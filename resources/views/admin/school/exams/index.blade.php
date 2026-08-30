@@ -5,8 +5,11 @@
             <p class="eyebrow">Kiểm tra và thi</p>
             <h1>Lịch thi</h1>
             <p class="text-secondary mb-0">Quản lý lịch giữa kỳ, cuối kỳ và các bài kiểm tra tập trung.</p>
-        </div><a href="{{ route('admin.school.exams.create') }}" class="btn btn-primary" data-modal-title="Thêm lịch thi"><i
-                data-lucide="plus"></i> Thêm lịch thi</a>
+        </div>
+        @if (auth()->user()->hasPermission('exams.create'))
+            <a href="{{ route('admin.school.exams.create') }}" class="btn btn-primary" data-modal-title="Thêm lịch thi"><i
+                    data-lucide="plus"></i> Thêm lịch thi</a>
+        @endif
     </div>
     <div class="card filter-card mb-4"><div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-3 mb-3"><div><strong>Bộ lọc lịch thi</strong><small class="d-block text-secondary">Lọc theo năm học, học kỳ, môn, lớp, loại và ngày thi.</small></div><a class="btn btn-sm btn-light" href="{{ route('admin.school.exams.index') }}" title="Đặt lại bộ lọc"><i data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a></div>
@@ -53,16 +56,22 @@
                                 @empty
                                     <span class="text-secondary">Chưa phân công</span>
                                 @endforelse
-                                <a href="{{ route('admin.school.exam-invigilations.create', ['exam_id' => $exam->id]) }}" data-modal-url="{{ route('admin.school.exam-invigilations.create', ['exam_id' => $exam->id]) }}" data-modal-title="Phân công coi thi" class="btn btn-sm btn-light mt-1" title="Phân công coi thi"><i data-lucide="user-plus"></i><span class="visually-hidden">Phân công</span></a>
+                                @if (auth()->user()->hasPermission('exam-invigilations.create'))
+                                    <a href="{{ route('admin.school.exam-invigilations.create', ['exam_id' => $exam->id]) }}" data-modal-url="{{ route('admin.school.exam-invigilations.create', ['exam_id' => $exam->id]) }}" data-modal-title="Phân công coi thi" class="btn btn-sm btn-light mt-1" title="Phân công coi thi"><i data-lucide="user-plus"></i><span class="visually-hidden">Phân công</span></a>
+                                @endif
                             </td>
                             <td class="text-end">
-                                <a href="{{ route('admin.school.exams.edit', $exam) }}"
-                                    class="btn btn-sm btn-light" data-modal-title="Sửa lịch thi" title="Sửa"><i
-                                        data-lucide="pencil"></i></a>
-                                <form action="{{ route('admin.school.exams.destroy', $exam) }}" method="POST"
-                                    data-modal-title="Xóa lịch thi" data-confirm="Xóa lịch thi này?">@csrf
-                                    @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="Xóa"><i
-                                            data-lucide="trash-2"></i></button></form>
+                                @if (auth()->user()->hasPermission('exams.edit'))
+                                    <a href="{{ route('admin.school.exams.edit', $exam) }}"
+                                        class="btn btn-sm btn-light" data-modal-title="Sửa lịch thi" title="Sửa"><i
+                                            data-lucide="pencil"></i></a>
+                                @endif
+                                @if (auth()->user()->hasPermission('exams.delete'))
+                                    <form action="{{ route('admin.school.exams.destroy', $exam) }}" method="POST"
+                                        data-modal-title="Xóa lịch thi" data-confirm="Xóa lịch thi này?">@csrf
+                                        @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="Xóa"><i
+                                                data-lucide="trash-2"></i></button></form>
+                                @endif
                             </td>
                     </tr>@empty<tr>
                             <td colspan="8" class="empty-state">Chưa có lịch thi.</td>

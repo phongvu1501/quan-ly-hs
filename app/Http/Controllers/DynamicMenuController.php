@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\DynamicRecord;
 use App\Models\Menu;
-use App\Models\Permission;
 use Illuminate\Http\Request;
 
 class DynamicMenuController extends Controller
@@ -99,25 +98,18 @@ class DynamicMenuController extends Controller
         $roleIds = $user->roles()->pluck('roles.id');
         $permissionSlugs = $user->permissionSlugs();
         $menu->loadMissing('roles:id');
-        $canManageMenus = $permissionSlugs->contains('menus.manage');
 
         abort_unless(
             $menu->is_active
-                && ($canManageMenus || $menu->isVisibleTo($roleIds, $permissionSlugs)),
-            403
+                && $menu->isVisibleTo($roleIds, $permissionSlugs),
+            403,
+            'Bạn không có quyền truy cập chức năng này.'
         );
 
-        if ($menu->required_permission && ! $user->hasPermission($menu->required_permission)) {
-            abort(403, 'Bạn không có quyền truy cập chức năng này.');
-        }
+        $permission = $menu->permissionForAction($action);
 
-        // Optional conventional permissions make CRUD stricter when they
-        // exist; otherwise the role-menu assignment is the access grant.
-        if ($action !== 'view') {
-            $permission = "{$menu->slug}.{$action}";
-            if (Permission::where('slug', $permission)->exists()) {
-                abort_unless($user->hasPermission($permission), 403);
-            }
+        if ($permission && ! $user->hasPermission($permission)) {
+            abort(403, 'Bạn không có quyền truy cập chức năng này.');
         }
     }
 }

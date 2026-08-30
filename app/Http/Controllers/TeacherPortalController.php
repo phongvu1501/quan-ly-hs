@@ -129,7 +129,10 @@ class TeacherPortalController extends Controller
         $year = $this->currentYear();
         $assignments = $teacher->assignments()->with(['class.grade', 'subject', 'semester'])->where('academic_year_id', $year?->id)->where('status', 'active')->get();
         $assignment = $assignments->firstWhere('id', (int) $request->assignment_id) ?: $assignments->first();
-        $students = $assignment?->class()->with(['enrollments' => fn ($query) => $query->with('student')->where('status', 'active')])->first()?->enrollments ?? collect();
+        $students = $assignment?->class()->with(['enrollments' => fn ($query) => $query
+            ->with('student')->where('status', 'active')
+            ->whereHas('student', fn ($student) => $student->where('status', Student::STATUS_STUDYING))])
+            ->first()?->enrollments ?? collect();
         $semesterId = $assignment?->semester_id ?: $this->currentSemester($year)?->id;
 
         $scoreMap = $assignment ? Score::where('assignment_id', $assignment->id)
@@ -180,7 +183,11 @@ class TeacherPortalController extends Controller
             ->where('status', 'active')
             ->findOrFail($data['assignment_id']);
         abort_unless($assignment->academic_year_id === $this->currentYear()?->id, 403);
-        abort_unless($assignment->class->enrollments()->where('student_id', $data['student_id'])->where('status', 'active')->exists(), 422, 'Học sinh không thuộc lớp được phân công.');
+        abort_unless($assignment->class->enrollments()
+            ->where('student_id', $data['student_id'])
+            ->where('status', 'active')
+            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
+            ->exists(), 422, 'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.');
 
         $semesterId = $assignment->semester_id ?: Semester::where('academic_year_id', $assignment->academic_year_id)
             ->where('is_current', true)
@@ -205,7 +212,6 @@ class TeacherPortalController extends Controller
         $data = $request->validate([
             'assignment_id' => ['required', 'exists:teaching_assignments,id'],
             'scores' => ['required', 'array', 'min:1'],
-            'scores.*.score_id' => ['nullable', 'integer', 'exists:scores,id'],
             'scores.*.score_type' => ['required', 'string', 'max:30'],
             'scores.*.score' => ['nullable', 'numeric', 'min:0', 'max:10'],
             'scores.*.assessed_on' => ['nullable', 'date'],
@@ -219,6 +225,7 @@ class TeacherPortalController extends Controller
 
         $studentIds = $assignment->class->enrollments()
             ->where('status', 'active')
+            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
             ->pluck('student_id')
             ->map(fn ($id) => (int) $id);
         $semesterId = $assignment->semester_id ?: Semester::where('academic_year_id', $assignment->academic_year_id)
@@ -246,19 +253,7 @@ class TeacherPortalController extends Controller
                 'note' => $row['note'] ?? null,
                 'entered_by' => auth()->id(),
             ];
-            $existing = ! empty($row['score_id'])
-                ? Score::whereKey($row['score_id'])
-                    ->where('assignment_id', $assignment->id)
-                    ->where('student_id', $studentId)
-                    ->where('teacher_id', $teacher->id)
-                    ->first()
-                : null;
-
-            if ($existing && $existing->score_type === $row['score_type']) {
-                $existing->update($attributes);
-            } else {
-                Score::create($attributes + ['student_id' => $studentId, 'assignment_id' => $assignment->id]);
-            }
+            Score::create($attributes + ['student_id' => $studentId, 'assignment_id' => $assignment->id]);
             $saved++;
         }
 
@@ -272,7 +267,11 @@ class TeacherPortalController extends Controller
             ->where('status', 'active')
             ->findOrFail($score->assignment_id);
         abort_unless((int) $assignment->academic_year_id === (int) $this->currentYear()?->id, 403);
-        abort_unless($assignment->class->enrollments()->where('student_id', $score->student_id)->where('status', 'active')->exists(), 422, 'Học sinh không thuộc lớp được phân công.');
+        abort_unless($assignment->class->enrollments()
+            ->where('student_id', $score->student_id)
+            ->where('status', 'active')
+            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
+            ->exists(), 422, 'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.');
 
         $data = $request->validate([
             'score_type' => ['required', 'string', 'max:30'],
@@ -293,7 +292,9 @@ class TeacherPortalController extends Controller
         $classes = $teacher->homeroomClasses()->with('grade')->where('academic_year_id', $year?->id)->get()->merge($assignments->pluck('class'))->unique('id')->values();
         $class = $classes->firstWhere('id', (int) $request->class_id) ?: $classes->first();
         $date = $request->date('date') ?: today();
-        $students = $class?->enrollments()->with('student')->where('status', 'active')->orderBy('roll_number')->get() ?? collect();
+        $students = $class?->enrollments()->with('student')->where('status', 'active')
+            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
+            ->orderBy('roll_number')->get() ?? collect();
         $records = $class ? AttendanceRecord::where('class_id', $class->id)->whereDate('attended_on', $date)->get()->keyBy('student_id') : collect();
 
         return view('teacher.attendance', compact('teacher', 'classes', 'class', 'date', 'students', 'records'));
@@ -320,8 +321,10 @@ class TeacherPortalController extends Controller
                 ->class;
 
         foreach ($data['statuses'] as $studentId => $status) {
-            abort_unless($class->enrollments()->where('student_id', $studentId)->where('status', 'active')->exists(), 422);
-            AttendanceRecord::updateOrCreate(
+            abort_unless($class->enrollments()->where('student_id', $studentId)->where('status', 'active')
+                ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))->exists(), 422,
+                'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.');
+            AttendanceRecord::firstOrCreate(
                 ['class_id' => $class->id, 'student_id' => $studentId, 'attended_on' => $data['attended_on'], 'period' => null, 'subject_id' => null],
                 ['academic_year_id' => $this->currentYear()?->id, 'status' => $status, 'reason' => $data['reasons'][$studentId] ?? null, 'recorded_by' => auth()->id()]
             );
@@ -342,7 +345,9 @@ class TeacherPortalController extends Controller
                 ->where('class_id', $attendance->class_id)
                 ->firstOrFail()
                 ->class;
-        abort_unless($class->enrollments()->where('student_id', $attendance->student_id)->where('status', 'active')->exists(), 422, 'Học sinh không thuộc lớp được phân công.');
+        abort_unless($class->enrollments()->where('student_id', $attendance->student_id)->where('status', 'active')
+            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))->exists(), 422,
+            'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.');
 
         $data = $request->validate([
             'attended_on' => ['required', 'date'],
@@ -399,6 +404,7 @@ class TeacherPortalController extends Controller
                 ->with('student')
                 ->where('academic_year_id', $year?->id)
                 ->where('status', 'active')
+                ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
                 ->orderBy('roll_number')
                 ->get()
             : collect();
@@ -440,6 +446,7 @@ class TeacherPortalController extends Controller
             ->where('academic_year_id', $year->id)
             ->firstOrFail();
         $student = Student::findOrFail($data['student_id']);
+        abort_unless($student->isStudying(), 422, 'Học sinh hiện không ở trạng thái "Đang học" nên không thể nhận nhận xét mới.');
         $classIds = $student->enrollments()
             ->where('academic_year_id', $year->id)
             ->where('status', 'active')
@@ -477,7 +484,6 @@ class TeacherPortalController extends Controller
             'subject_id' => ['nullable', 'exists:subjects,id'],
             'semester_id' => ['required', 'integer'],
             'comments' => ['required', 'array', 'min:1'],
-            'comments.*.comment_id' => ['nullable', 'integer', 'exists:teacher_comments,id'],
             'comments.*.content' => ['nullable', 'string', 'max:3000'],
         ]);
 
@@ -494,7 +500,8 @@ class TeacherPortalController extends Controller
         abort_unless($classIds->contains((int) $data['class_id']), 403, 'Bạn không được phân công cho lớp này.');
 
         $studentIds = $classIds->contains((int) $data['class_id'])
-            ? Student::whereHas('enrollments', fn ($query) => $query->where('class_id', $data['class_id'])->where('academic_year_id', $year->id)->where('status', 'active'))->pluck('id')
+            ? Student::where('status', Student::STATUS_STUDYING)
+                ->whereHas('enrollments', fn ($query) => $query->where('class_id', $data['class_id'])->where('academic_year_id', $year->id)->where('status', 'active'))->pluck('id')
             : collect();
         $saved = 0;
         foreach ($data['comments'] as $studentId => $row) {
@@ -520,26 +527,14 @@ class TeacherPortalController extends Controller
                 ->exists();
             abort_unless($isHomeroomTeacher || $hasTeachingAssignment, 403, 'Bạn không được phân công cho học sinh này.');
 
-            $existing = ! empty($row['comment_id'])
-                ? TeacherComment::whereKey($row['comment_id'])
-                    ->where('teacher_id', $teacher->id)
-                    ->where('student_id', $studentId)
-                    ->where('academic_year_id', $year->id)
-                    ->where('semester_id', $semester->id)
-                    ->first()
-                : null;
-            if ($existing && (int) $existing->subject_id === (int) ($data['subject_id'] ?: 0)) {
-                $existing->update(['content' => $content]);
-            } else {
-                TeacherComment::create([
-                    'academic_year_id' => $year->id,
-                    'semester_id' => $semester->id,
-                    'student_id' => $studentId,
-                    'subject_id' => $data['subject_id'] ?: null,
-                    'teacher_id' => $teacher->id,
-                    'content' => $content,
-                ]);
-            }
+            TeacherComment::create([
+                'academic_year_id' => $year->id,
+                'semester_id' => $semester->id,
+                'student_id' => $studentId,
+                'subject_id' => $data['subject_id'] ?: null,
+                'teacher_id' => $teacher->id,
+                'content' => $content,
+            ]);
             $saved++;
         }
 

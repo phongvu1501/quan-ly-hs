@@ -31,23 +31,9 @@
                     </div>
                 </div>
 
-                <div class="permission-section">
-                    <div class="section-label">Quyền truy cập</div>
-                    <div class="row g-2">
-                        @foreach ($permissions as $permission)
-                            <div class="col-lg-4 col-md-6">
-                                <label class="check-tile">
-                                    <input type="checkbox" name="permissions[]" value="{{ $permission->id }}"
-                                        @checked(in_array($permission->id, old('permissions', [])))>
-                                    <span>
-                                        <strong>{{ $permission->name }}</strong>
-                                        <small>{{ $permission->slug }}</small>
-                                    </span>
-                                </label>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
+                @include('admin.roles.partials.permission-matrix', [
+                    'selectedPermissionIds' => collect(old('permissions', []))->map(fn ($id) => (int) $id)->all(),
+                ])
 
                 <div class="permission-section">
                     <div class="section-label">Menu được hiển thị</div>
