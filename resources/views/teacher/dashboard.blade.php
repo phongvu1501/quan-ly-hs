@@ -70,6 +70,7 @@
                             <tr>
                                 <th>Lớp</th>
                                 <th>Môn học</th>
+                                <th>Sĩ số</th>
                                 <th>Học kỳ</th>
                                 <th class="text-end">Thao tác</th>
                             </tr>
@@ -81,6 +82,7 @@
                                             class="d-block text-secondary">{{ $assignment->class?->grade?->name }}</small>
                                     </td>
                                     <td>{{ $assignment->subject?->name }}</td>
+                                    <td>{{ $assignment->class?->enrollments?->count() ?: 0 }} học sinh</td>
                                     <td>{{ $assignment->semester?->name ?: 'Cả năm' }}</td>
                                     <td class="text-end"><a class="btn btn-sm btn-light"
                                             href="{{ route('teacher.scores', ['assignment_id' => $assignment->id]) }}"><i
@@ -88,7 +90,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="empty-state">Chưa có phân công giảng dạy.</td>
+                                    <td colspan="5" class="empty-state">Chưa có phân công giảng dạy.</td>
                                 </tr>
                             @endforelse
                         </tbody>

@@ -1,12 +1,5 @@
 <?php
 
-use App\Http\Controllers\Admin\MenuController;
-use App\Http\Controllers\Admin\PermissionController;
-use App\Http\Controllers\Admin\RoleController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DynamicMenuController;
-use App\Http\Controllers\Admin\SchoolController;
 use App\Http\Controllers\Admin\Finance\FeeAssessmentController;
 use App\Http\Controllers\Admin\Finance\FeeCategoryController;
 use App\Http\Controllers\Admin\Finance\FeePaymentController;
@@ -23,13 +16,19 @@ use App\Http\Controllers\Admin\Finance\SalaryProfileController;
 use App\Http\Controllers\Admin\Finance\StudentFeePolicyController;
 use App\Http\Controllers\Admin\Finance\TaxConfigController;
 use App\Http\Controllers\Admin\Finance\TeachingExtraController;
-use App\Http\Controllers\TeacherPortalController;
-use App\Http\Controllers\StudentPortalController;
+use App\Http\Controllers\Admin\MenuController;
+use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\SchoolController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DynamicMenuController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StudentPortalController;
+use App\Http\Controllers\TeacherPortalController;
 use App\Http\Middleware\EnsureFinanceSchema;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-
 
 /*
 | Guest Routes
@@ -50,7 +49,6 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-
 /*
 | Home
 */
@@ -62,7 +60,6 @@ Route::get('/', function () {
         : redirect()->route('login');
 })->name('home');
 
-
 /*
 | Logout
 */
@@ -70,7 +67,6 @@ Route::get('/', function () {
 Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
-
 
 /*
 | Dashboard
@@ -82,7 +78,7 @@ Route::middleware('auth')->group(function () {
 
         $user = auth()->user();
 
-        $target = app(\App\Http\Controllers\AuthController::class)
+        $target = app(AuthController::class)
             ->dashboardUrl($user);
 
         return $target === route('dashboard')
@@ -90,7 +86,6 @@ Route::middleware('auth')->group(function () {
             : redirect()->to($target);
     })->name('dashboard');
 });
-
 
 /*
 | Profile
@@ -103,7 +98,6 @@ Route::middleware('auth')->group(function () {
 
     Route::put('/profile', [ProfileController::class, 'update'])
         ->name('profile.update');
-
 
     /*
 
@@ -123,7 +117,6 @@ Route::middleware('auth')->group(function () {
         ->name('teacher.subject.dashboard')
         ->middleware('permission:teacher.dashboard');
 
-
     /*
 
     | Teacher - Scores
@@ -141,7 +134,6 @@ Route::middleware('auth')->group(function () {
     Route::put('/teacher/scores/{score}', [TeacherPortalController::class, 'updateScore'])
         ->name('teacher.scores.update')
         ->middleware('permission:scores.edit');
-
 
     /*
 
@@ -161,7 +153,6 @@ Route::middleware('auth')->group(function () {
         ->name('teacher.attendance.update')
         ->middleware('permission:attendance.edit');
 
-
     /*
 
     | Teacher - Comments
@@ -180,7 +171,6 @@ Route::middleware('auth')->group(function () {
         ->name('teacher.comments.update')
         ->middleware('permission:scores.edit');
 
-
     /*
     | Student Portal
     */
@@ -193,7 +183,6 @@ Route::middleware('auth')->group(function () {
         ->name('student.payments')
         ->middleware('permission:student-fees.view');
 
-
     /*
     | Teacher Notifications
     */
@@ -203,16 +192,14 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:teacher.dashboard');
 });
 
-
 /*
 | Admin Routes
 */
 
-Route::middleware('auth')
+Route::middleware(['auth', 'backoffice'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
-
 
         /*
         | Admin Dashboard
@@ -223,7 +210,6 @@ Route::middleware('auth')
         })
             ->middleware('permission:admin.access')
             ->name('dashboard');
-
 
         /*
         | ROLES
@@ -253,7 +239,6 @@ Route::middleware('auth')
             ->name('roles.destroy')
             ->middleware('permission:roles.delete');
 
-
         /*
         | USERS
         */
@@ -282,7 +267,6 @@ Route::middleware('auth')
             ->name('users.destroy')
             ->middleware('permission:users.delete');
 
-
         /*
         | PERMISSIONS
         */
@@ -310,7 +294,6 @@ Route::middleware('auth')
         Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])
             ->name('permissions.destroy')
             ->middleware('permission:permissions.delete');
-
 
         /*
         | MENUS
@@ -341,16 +324,14 @@ Route::middleware('auth')
             ->middleware('permission:menus.delete');
     });
 
-
 /*
 | SCHOOL MANAGEMENT
 */
 
-Route::middleware('auth')
+Route::middleware(['auth', 'backoffice'])
     ->prefix('admin/school')
     ->name('admin.school.')
     ->group(function () {
-
 
         /*
         | School Dashboard
@@ -359,7 +340,6 @@ Route::middleware('auth')
         Route::get('/', [SchoolController::class, 'dashboard'])
             ->name('dashboard')
             ->middleware('permission:school.dashboard');
-
 
         /*
         | STUDENTS
@@ -405,7 +385,6 @@ Route::middleware('auth')
             ->name('students.destroy')
             ->middleware('permission:students.delete');
 
-
         /*
         | TEACHERS
         */
@@ -450,7 +429,6 @@ Route::middleware('auth')
             ->name('teachers.destroy')
             ->middleware('permission:teachers.delete');
 
-
         /*
         | GRADES
         */
@@ -478,7 +456,6 @@ Route::middleware('auth')
         Route::delete('/grades/{grade}', [SchoolController::class, 'destroyGrade'])
             ->name('grades.destroy')
             ->middleware('permission:grades.delete');
-
 
         /*
         | SUBJECTS
@@ -512,7 +489,6 @@ Route::middleware('auth')
             ->name('subjects.destroy')
             ->middleware('permission:subjects.delete');
 
-
         /*
         | CLASSES
         */
@@ -545,7 +521,6 @@ Route::middleware('auth')
             ->name('classes.destroy')
             ->middleware('permission:classes.delete');
 
-
         /*
         | ASSIGNMENTS
         */
@@ -574,7 +549,6 @@ Route::middleware('auth')
             ->name('assignments.destroy')
             ->middleware('permission:assignments.delete');
 
-
         /*
         | SCORES
         */
@@ -583,7 +557,6 @@ Route::middleware('auth')
             ->name('scores.index')
             ->middleware('permission:scores.view');
 
-
         /*
         | ATTENDANCE
         */
@@ -591,7 +564,6 @@ Route::middleware('auth')
         Route::get('/attendance', [SchoolController::class, 'attendance'])
             ->name('attendance.index')
             ->middleware('permission:attendance.view');
-
 
         /*
         | SCHEDULES
@@ -612,7 +584,6 @@ Route::middleware('auth')
         Route::delete('/schedules/{schedule}', [SchoolController::class, 'destroySchedule'])
             ->name('schedules.destroy')
             ->middleware('permission:schedules.delete');
-
 
         /*
         | EXAMS
@@ -642,7 +613,6 @@ Route::middleware('auth')
             ->name('exams.destroy')
             ->middleware('permission:exams.delete');
 
-
         /*
         | EXAM INVIGILATIONS
         */
@@ -671,7 +641,6 @@ Route::middleware('auth')
             ->name('exam-invigilations.destroy')
             ->middleware('permission:exam-invigilations.delete');
 
-
         /*
         | ANNOUNCEMENTS
         */
@@ -699,7 +668,6 @@ Route::middleware('auth')
         Route::delete('/announcements/{announcement}', [SchoolController::class, 'destroyAnnouncement'])
             ->name('announcements.destroy')
             ->middleware('permission:announcements.delete');
-
 
         /*
         | FEES
@@ -730,12 +698,11 @@ Route::middleware('auth')
             ->middleware('permission:fees.delete');
     });
 
-
 /*
 | FINANCE MANAGEMENT
 */
 
-Route::middleware(['auth', EnsureFinanceSchema::class])
+Route::middleware(['auth', 'backoffice', EnsureFinanceSchema::class])
     ->prefix('admin/finance')
     ->name('admin.finance.')
     ->group(function () {
@@ -837,12 +804,11 @@ Route::middleware(['auth', EnsureFinanceSchema::class])
         Route::get('/reports/payroll', [FinanceReportController::class, 'payroll'])->name('reports.payroll')->middleware('permission:payrolls.report');
     });
 
-
 /*
 | Dynamic Menu Routes
 */
 
-Route::middleware('auth')
+Route::middleware(['auth', 'backoffice'])
     ->prefix('workspace')
     ->name('dynamic.menus.')
     ->group(function () {

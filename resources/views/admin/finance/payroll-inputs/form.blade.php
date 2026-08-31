@@ -61,6 +61,6 @@
                     <textarea name="note" class="form-control">{{ old('note', $payrollInput?->note) }}</textarea>
                 </div>
             </div>
-            <div class="form-actions"><button class="btn btn-primary"><i data-lucide="save"></i> Lưu input</button></div>
+            <div class="form-actions"><button class="btn btn-primary"><i data-lucide="save"></i> Lưu dữ liệu</button></div>
         </div>
 </form>@endsection

@@ -5,7 +5,7 @@
 @section('content')
     <div class="page-heading page-heading-inline">
         <div>
-            <p class="eyebrow">RBAC</p>
+            <p class="eyebrow">Phân quyền</p>
             <h1>Vai trò</h1>
             <p class="text-secondary mb-0">Một vai trò có thể chứa nhiều permission và nhiều menu.</p>
         </div>

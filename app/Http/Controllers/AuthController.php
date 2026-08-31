@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\JwtService;
+use App\Services\PortalAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -87,12 +88,13 @@ class AuthController extends Controller
     public function dashboardUrl(?User $user = null): string
     {
         $user ??= auth()->user();
+        $canAccessBackOffice = app(PortalAccessService::class)->canAccessBackOffice($user);
 
-        if ($user->hasPermission('school.dashboard')) {
+        if ($canAccessBackOffice && $user->hasPermission('school.dashboard')) {
             return route('admin.school.dashboard');
         }
 
-        if ($user->hasPermission('finance.dashboard')) {
+        if ($canAccessBackOffice && $user->hasPermission('finance.dashboard')) {
             return route('admin.finance.dashboard');
         }
 

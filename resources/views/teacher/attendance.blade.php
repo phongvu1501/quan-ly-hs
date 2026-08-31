@@ -22,7 +22,7 @@
                     <option value="{{ $item->id }}" @selected($class?->id === $item->id)>{{ $item->name }}</option>
                 @endforeach
             </select>
-            <input type="date" name="date" class="form-control" value="{{ $date->format('Y-m-d') }}"><button
+            <input id="attendance-date-filter" type="date" name="date" class="form-control" value="{{ $date->format('Y-m-d') }}"><button
                 class="btn btn-light">Xem</button>
         </form>
     </div>
@@ -122,6 +122,40 @@
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function() {
+                const loadedDate = @json($date->format('Y-m-d'));
+                const wasViewingToday = @json($date->isSameDay(today()));
+                const attendanceUrl = @json(route('teacher.attendance'));
+                const selectedClassId = @json($class?->id);
+
+                const dateInSchoolTimezone = () => {
+                    const parts = new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'Asia/Ho_Chi_Minh',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    }).formatToParts(new Date());
+                    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+                    return `${values.year}-${values.month}-${values.day}`;
+                };
+
+                const moveToNewAttendanceDay = () => {
+                    if (!wasViewingToday) return;
+                    const currentDate = dateInSchoolTimezone();
+                    if (currentDate === loadedDate) return;
+
+                    const url = new URL(attendanceUrl, window.location.origin);
+                    if (selectedClassId) url.searchParams.set('class_id', selectedClassId);
+                    url.searchParams.set('date', currentDate);
+                    window.location.replace(url.toString());
+                };
+
+                moveToNewAttendanceDay();
+                window.setInterval(moveToNewAttendanceDay, 60000);
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden) moveToNewAttendanceDay();
+                });
+
                 const form = document.getElementById('attendanceEditForm');
                 const date = document.getElementById('attendanceEditDate');
                 const status = document.getElementById('attendanceEditStatus');

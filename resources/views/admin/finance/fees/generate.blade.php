@@ -75,7 +75,7 @@
                     <textarea name="note" class="form-control" rows="3"></textarea>
                 </div>
             </div>
-            <div class="form-actions"><button class="btn btn-primary"><i data-lucide="play"></i> Generate</button><a
+            <div class="form-actions"><button class="btn btn-primary"><i data-lucide="play"></i> Lưu học phí</button><a
                     href="{{ route('admin.finance.fees.index') }}" class="btn btn-light">Hủy</a></div>
         </div>
     </form>

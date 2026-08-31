@@ -58,6 +58,7 @@
                             <th>Lớp</th>
                             <th>Môn học</th>
                             <th>Học kỳ</th>
+                            <th>Sĩ số</th>
                             <th>Số điểm đã nhập</th>
                             <th class="text-end">Thao tác</th>
                         </tr>
@@ -70,16 +71,17 @@
                                         {{ $assignment->class?->room ?: 'Chưa xếp phòng' }}</small></td>
                                 <td>{{ $assignment->subject?->name }}</td>
                                 <td>{{ $assignment->semester?->name ?: 'Cả năm' }}</td>
+                                <td>{{ $assignment->class?->enrollments?->count() ?: 0 }} học sinh</td>
                                 <td>{{ $assignment->scores_count }}</td>
                                 <td class="text-end"><a class="btn btn-sm btn-light"
                                         href="{{ route('teacher.scores', ['assignment_id' => $assignment->id]) }}"><i
-                                            data-lucide="square-pen"></i> Nhập điểm</a> <a class="btn btn-sm btn-light"
+                                            data-lucide="square-pen"></i> Học sinh &amp; điểm</a> <a class="btn btn-sm btn-light"
                                         href="{{ route('teacher.attendance', ['class_id' => $assignment->class_id]) }}"><i
                                             data-lucide="clipboard-check"></i> Điểm danh</a></td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="empty-state">Chưa có phân công bộ môn.</td>
+                                <td colspan="6" class="empty-state">Chưa có phân công bộ môn.</td>
                             </tr>
                         @endforelse
                     </tbody>

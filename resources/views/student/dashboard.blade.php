@@ -20,8 +20,8 @@
             </div>
         </div>
         <div class="d-flex gap-2"><a href="{{ route('profile.show') }}" class="btn btn-light"><i
-                    data-lucide="user-round-cog"></i> Hồ sơ</a>@if(auth()->user()->hasPermission('fees.view'))<a href="{{ route('student.payments') }}"
-                class="btn btn-light"><i data-lucide="receipt-text"></i> Học phí</a>@endif</div>
+                    data-lucide="user-round-cog"></i> Hồ sơ</a>@if(auth()->user()->hasPermission('student-fees.view'))<a href="{{ route('student.payments') }}"
+                class="btn btn-light" data-native-navigation="true"><i data-lucide="receipt-text"></i> Học phí</a>@endif</div>
     </div>
 
     @if (!$section || $section === 'class')
@@ -70,7 +70,7 @@
                 </div>
             @endif
             @if (!$section && auth()->user()->hasPermission('student-fees.view'))
-                <a class="overview-item text-decoration-none" href="{{ route('student.payments') }}"><span
+                <a class="overview-item text-decoration-none" href="{{ route('student.payments') }}" data-native-navigation="true"><span
                         class="overview-icon"><i data-lucide="wallet-cards"></i></span>
                     <h2>Học phí cần đóng</h2>
                     <p class="fs-3 fw-bold text-dark mb-0">
@@ -222,25 +222,45 @@
                 </div>
             </div>
         @endif
-        @if (!$section && auth()->user()->hasPermission('fees.view'))
+        @if (!$section && auth()->user()->hasPermission('student-fees.view'))
             <div class="col-xl-5">
                 <div id="fees" class="card table-card h-100">
                     <div class="card-body border-bottom d-flex justify-content-between align-items-center">
                         <h2 class="panel-title mb-0">Khoản cần đóng</h2><a href="{{ route('student.payments') }}"
-                            class="btn btn-sm btn-light">Chi tiết</a>
+                            class="btn btn-sm btn-light" data-native-navigation="true">Chi tiết</a>
                     </div>
                     <div class="list-group list-group-flush">
-                        @forelse($fees->take(6) as $fee)
-                            @php($feePayment = $fee->payments->first())
-                            <div class="list-group-item px-4 py-3"><strong>{{ $fee->title }}</strong>
-                                <div class="d-flex justify-content-between mt-1"><small class="text-secondary">Hạn
-                                        {{ $fee->due_on?->format('d/m/Y') ?: 'chưa chốt' }}</small><strong>{{ number_format((float) $fee->amount, 0, ',', '.') }}
-                                        đ</strong></div><small
-                                    class="{{ $feePayment?->status === 'paid' ? 'text-success' : 'text-warning' }}">{{ $feePayment?->status === 'paid' ? 'Đã đóng' : 'Chưa đóng' }}</small>
-                            </div>
-                        @empty
-                            <div class="empty-state">Không có khoản cần đóng.</div>
-                        @endforelse
+                        @if ($feeAssessments->isNotEmpty())
+                            @forelse($feeAssessments->take(6) as $assessment)
+                                <div class="list-group-item px-4 py-3">
+                                    <strong>{{ $assessment->fee_notice_title_snapshot ?: $assessment->category?->name ?: 'Khoản thu' }}</strong>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <small class="text-secondary">Hạn {{ $assessment->due_date?->format('d/m/Y') ?: 'chưa chốt' }}</small>
+                                        <strong>{{ number_format((float) $assessment->final_amount, 0, ',', '.') }} đ</strong>
+                                    </div>
+                                    <small class="{{ $assessment->status === 'paid' ? 'text-success' : 'text-warning' }}">
+                                        {{ \App\Support\FinanceLabels::feeStatus($assessment->status) }}
+                                        @if ((float) $assessment->remaining_amount > 0)
+                                            · Còn {{ number_format((float) $assessment->remaining_amount, 0, ',', '.') }} đ
+                                        @endif
+                                    </small>
+                                </div>
+                            @empty
+                                <div class="empty-state">Không có khoản cần đóng.</div>
+                            @endforelse
+                        @else
+                            @forelse($fees->take(6) as $fee)
+                                @php($feePayment = $fee->payments->first())
+                                <div class="list-group-item px-4 py-3"><strong>{{ $fee->title }}</strong>
+                                    <div class="d-flex justify-content-between mt-1"><small class="text-secondary">Hạn
+                                            {{ $fee->due_on?->format('d/m/Y') ?: 'chưa chốt' }}</small><strong>{{ number_format((float) $fee->amount, 0, ',', '.') }}
+                                            đ</strong></div><small
+                                        class="{{ $feePayment?->status === 'paid' ? 'text-success' : 'text-warning' }}">{{ $feePayment?->status === 'paid' ? 'Đã đóng' : 'Chưa đóng' }}</small>
+                                </div>
+                            @empty
+                                <div class="empty-state">Không có khoản cần đóng.</div>
+                            @endforelse
+                        @endif
                     </div>
                 </div>
             </div>
@@ -248,7 +268,7 @@
     </div>
     @endif
 
-    @if (!$section || $section === 'attendance')
+    @if (!$section || in_array($section, ['attendance', 'comments'], true))
     <div class="row g-4">
         @if (!$section || $section === 'attendance')
             <div id="attendance" class="col-xl-7">
@@ -289,7 +309,7 @@
                 </div>
             </div>
         @endif
-        @if (!$section)
+        @if (!$section || $section === 'comments')
             <div class="col-xl-5">
                 <div class="card table-card h-100">
                     <div class="card-body border-bottom">

@@ -1087,6 +1087,8 @@
         }
     </style>
 
+    <link rel="stylesheet" href="{{ asset('css/admin-redesign.css') }}">
+
     @stack('styles')
 
 </head>
@@ -1106,9 +1108,29 @@
 
         <aside class="sidebar" id="sidebar">
             @php
-                $sidebarMenus = app(\App\Services\MenuService::class)->forUser(auth()->user());
+                $hasAdminAccess = app(\App\Services\PortalAccessService::class)
+                    ->canAccessBackOffice(auth()->user());
+                $sidebarContext = match (true) {
+                    request()->routeIs('teacher.*') => 'teacher',
+                    request()->routeIs('student.*') => 'student',
+                    auth()->user()->teacherProfile && ! $hasAdminAccess => 'teacher',
+                    auth()->user()->studentProfile && ! $hasAdminAccess => 'student',
+                    default => 'admin',
+                };
+                $isAdminSidebar = $sidebarContext === 'admin';
+                $canViewTeacherPortal = auth()->user()->teacherProfile
+                    && (auth()->user()->hasPermission('teacher.dashboard')
+                        || auth()->user()->hasPermission('homeroom.dashboard'));
+                $teacherSectionRoute = request()->routeIs('teacher.subject.dashboard')
+                    || ! auth()->user()->hasPermission('homeroom.dashboard')
+                        ? 'teacher.subject.dashboard'
+                        : 'teacher.homeroom.dashboard';
+                $sidebarMenus = $isAdminSidebar
+                    ? app(\App\Services\MenuService::class)->forUser(auth()->user())
+                    : collect();
                 $sidebarGrades =
-                    auth()->user()->hasPermission('grades.view') || auth()->user()->hasPermission('classes.view')
+                    $isAdminSidebar &&
+                    (auth()->user()->hasPermission('grades.view') || auth()->user()->hasPermission('classes.view'))
                         ? \App\Models\Grade::with([
                             'classes' => fn($query) => $query
                                 ->where('status', 'active')
@@ -1137,12 +1159,21 @@
                     'fees.view',
                 ];
                 $canViewSchoolNavigation =
-                    auth()->user()->hasPermission('school.dashboard') ||
-                    collect($schoolViewPermissions)->contains(
-                        fn($permission) => auth()->user()->hasPermission($permission),
-                    );
-                $dashboardUrl = app(\App\Http\Controllers\AuthController::class)->dashboardUrl(auth()->user());
+                    $isAdminSidebar &&
+                    (auth()->user()->hasPermission('school.dashboard') ||
+                        collect($schoolViewPermissions)->contains(
+                            fn($permission) => auth()->user()->hasPermission($permission),
+                        ));
+                $dashboardUrl = match ($sidebarContext) {
+                    'teacher' => auth()->user()->hasPermission('homeroom.dashboard')
+                        ? route('teacher.homeroom.dashboard')
+                        : route('teacher.subject.dashboard'),
+                    'student' => route('student.dashboard'),
+                    default => app(\App\Http\Controllers\AuthController::class)->dashboardUrl(auth()->user()),
+                };
                 $dashboardLabel = match (true) {
+                    $sidebarContext === 'teacher' => 'Cổng giáo viên',
+                    $sidebarContext === 'student' => 'Cổng học sinh',
                     auth()->user()->hasPermission('school.dashboard') => 'Tổng quan nhà trường',
                     auth()->user()->hasPermission('finance.dashboard') => 'Tổng quan tài chính',
                     auth()->user()->teacherProfile && auth()->user()->hasPermission('teacher.dashboard')
@@ -1156,17 +1187,17 @@
             <a class="brand" href="{{ route('dashboard') }}">
 
                 <span class="brand-mark">
-                    <i data-lucide="shopping-bag"></i>
+                    <i data-lucide="school"></i>
                 </span>
 
                 <span>
 
                     <span class="brand-name d-block">
-                        Quản lý học sinh
+                        Quản lý trường học
                     </span>
 
                     <span class="brand-caption d-block">
-                        Quản trị hệ thống
+                        {{ $sidebarContext === 'teacher' ? 'Không gian giáo viên' : ($sidebarContext === 'student' ? 'Không gian học sinh' : 'Quản trị hệ thống') }}
                     </span>
 
                 </span>
@@ -1192,6 +1223,7 @@
                         'admin.dashboard',
                         'admin.school.dashboard',
                         'admin.finance.dashboard',
+                        'teacher.dashboard',
                         'teacher.homeroom.dashboard',
                         'teacher.subject.dashboard',
                         'student.dashboard'),
@@ -1207,26 +1239,26 @@
 
                 <div class="nav-divider"></div>
 
-                @if (auth()->user()->hasPermission('users.view'))
+                @if ($isAdminSidebar && auth()->user()->hasPermission('users.view'))
                     <a href="{{ route('admin.users.index') }}" @class(['active' => request()->routeIs('admin.users.*')])>
                         <i data-lucide="users"></i>
                         <span>Tài khoản</span>
                     </a>
                 @endif
 
-                @if (auth()->user()->hasPermission('roles.view'))
+                @if ($isAdminSidebar && auth()->user()->hasPermission('roles.view'))
                     <a href="{{ route('admin.roles.index') }}" @class(['active' => request()->routeIs('admin.roles.*')])>
                         <i data-lucide="shield-check"></i><span>Vai trò</span>
                     </a>
                 @endif
 
-                @if (auth()->user()->hasPermission('permissions.view'))
+                @if ($isAdminSidebar && auth()->user()->hasPermission('permissions.view'))
                     <a href="{{ route('admin.permissions.index') }}" @class(['active' => request()->routeIs('admin.permissions.*')])>
                         <i data-lucide="key-round"></i><span>Quyền truy cập</span>
                     </a>
                 @endif
 
-                @if (auth()->user()->hasPermission('menus.view'))
+                @if ($isAdminSidebar && auth()->user()->hasPermission('menus.view'))
                     <a href="{{ route('admin.menus.index') }}" @class(['active' => request()->routeIs('admin.menus.*')])>
                         <i data-lucide="list-tree"></i><span>Điều hướng</span>
                     </a>
@@ -1390,7 +1422,7 @@
                         'fees.report',
                         'payrolls.report',
                     ];
-                    $canViewFinanceNavigation = collect($financeViewPermissions)->contains(
+                    $canViewFinanceNavigation = $isAdminSidebar && collect($financeViewPermissions)->contains(
                         fn($permission) => auth()->user()->hasPermission($permission),
                     );
                 @endphp
@@ -1496,7 +1528,7 @@
                     </details>
                 @endif
 
-                @if (auth()->user()->teacherProfile && auth()->user()->hasPermission('teacher.dashboard'))
+                @if ($sidebarContext === 'teacher' && $canViewTeacherPortal)
                     <div class="nav-divider"></div>
                     <details class="nav-group" data-sidebar-key="teacher"
                         @if (request()->routeIs('teacher.*')) open @endif>
@@ -1513,16 +1545,17 @@
                                     ])><i data-lucide="school"></i><span>Lớp chủ
                                         nhiệm</span></a>
                             @endif
-                            <a href="{{ route('teacher.subject.dashboard', ['section' => 'assignments']) }}#assignments"
-                                @class([
-                                    'active' =>
-                                        request()->routeIs('teacher.subject.dashboard') &&
-                                        in_array(request()->get('section'), [null, 'assignments'], true),
-                                ])><i data-lucide="users-round"></i><span>Lớp bộ
-                                    môn</span></a>
+                            @if (auth()->user()->hasPermission('teacher.dashboard'))
+                                <a href="{{ route('teacher.subject.dashboard', ['section' => 'assignments']) }}#assignments"
+                                    @class([
+                                        'active' =>
+                                            request()->routeIs('teacher.subject.dashboard') &&
+                                            in_array(request()->get('section'), [null, 'assignments'], true),
+                                    ])><i data-lucide="users-round"></i><span>Lớp bộ môn</span></a>
+                            @endif
                             @if (auth()->user()->hasPermission('scores.view'))
                                 <a href="{{ route('teacher.scores') }}" @class(['active' => request()->routeIs('teacher.scores')])><i
-                                        data-lucide="square-pen"></i><span>Nhập điểm</span></a>
+                                        data-lucide="square-pen"></i><span>Học sinh &amp; sổ điểm</span></a>
                                 <a href="{{ route('teacher.comments') }}" @class(['active' => request()->routeIs('teacher.comments')])><i
                                         data-lucide="message-square-text"></i><span>Nhận xét học sinh</span></a>
                             @endif
@@ -1530,18 +1563,17 @@
                                 <a href="{{ route('teacher.attendance') }}" @class(['active' => request()->routeIs('teacher.attendance')])><i
                                         data-lucide="clipboard-check"></i><span>Điểm danh</span></a>
                             @endif
-                            <a href="{{ route('teacher.subject.dashboard', ['section' => 'schedule']) }}#schedule"
-                                @class(['active' => request()->get('section') === 'schedule'])><i data-lucide="calendar-days"></i><span>Thời khóa
-                                    biểu</span></a>
-                            <a href="{{ route('teacher.subject.dashboard', ['section' => 'announcements']) }}#announcements"
+                            <a href="{{ route($teacherSectionRoute, ['section' => 'schedule']) }}#schedule"
+                                @class(['active' => request()->get('section') === 'schedule'])><i data-lucide="calendar-days"></i><span>Thời khóa biểu</span></a>
+                            <a href="{{ route($teacherSectionRoute, ['section' => 'announcements']) }}#announcements"
                                 @class(['active' => request()->get('section') === 'announcements'])><i data-lucide="megaphone"></i><span>Thông báo</span></a>
-                            <a href="{{ route('teacher.subject.dashboard', ['section' => 'exams']) }}#exams"
+                            <a href="{{ route($teacherSectionRoute, ['section' => 'exams']) }}#exams"
                                 @class(['active' => request()->get('section') === 'exams'])><i data-lucide="file-clock"></i><span>Lịch thi</span></a>
                         </div>
                     </details>
                 @endif
 
-                @if (auth()->user()->hasPermission('student.dashboard') && auth()->user()->studentProfile)
+                @if ($sidebarContext === 'student' && auth()->user()->hasPermission('student.dashboard') && auth()->user()->studentProfile)
                     <div class="nav-divider"></div>
                     <details class="nav-group" data-sidebar-key="student"
                         @if (request()->routeIs('student.*')) open @endif>
@@ -1568,14 +1600,15 @@
                             <a href="{{ route('student.dashboard', ['section' => 'exams']) }}#exams"
                                 @class(['active' => request()->get('section') === 'exams'])><i data-lucide="file-clock"></i><span>Lịch thi</span></a>
                             @if (auth()->user()->hasPermission('student-fees.view'))
-                                <a href="{{ route('student.payments') }}" @class(['active' => request()->routeIs('student.payments')])><i
+                                <a href="{{ route('student.payments') }}" data-native-navigation="true"
+                                    @class(['active' => request()->routeIs('student.payments')])><i
                                         data-lucide="wallet-cards"></i><span>Học phí</span></a>
                             @endif
                         </div>
                     </details>
                 @endif
 
-                @if ($sidebarMenus->isNotEmpty())
+                @if ($isAdminSidebar && $sidebarMenus->isNotEmpty())
                     <div class="nav-divider"></div>
                     @include('admin.layouts.menu-tree', ['menus' => $sidebarMenus])
                 @endif
@@ -1635,42 +1668,32 @@
 
                 {{-- ACCOUNT --}}
 
-                <div class="account">
-
-                    @if (auth()->user()->avatar_path)
-                        <img src="{{ asset('storage/' . auth()->user()->avatar_path) }}" alt="Ảnh đại diện"
-                            class="account-avatar" style="object-fit:cover">
-                    @else
-                        <div class="account-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</div>
-                    @endif
-
-
-                    <div class="account-details">
-
-                        <div class="account-name">
-                            {{ auth()->user()->name }}
-                        </div>
-
-                        <div class="account-email">
-                            {{ auth()->user()->email }}
-                        </div>
-
+                <div class="account account-dropdown dropdown">
+                    <button type="button" class="dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
+                        aria-label="Mở menu tài khoản">
+                        @if (auth()->user()->avatar_path)
+                            <img src="{{ asset('storage/' . auth()->user()->avatar_path) }}" alt="Ảnh đại diện"
+                                class="account-avatar" style="object-fit: cover">
+                        @else
+                            <span class="account-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
+                        @endif
+                        <span class="account-details text-start">
+                            <span class="account-name d-block">{{ auth()->user()->name }}</span>
+                            <span class="account-email d-block">{{ auth()->user()->email }}</span>
+                        </span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <a class="dropdown-item" href="{{ route('profile.show') }}">
+                            <i data-lucide="circle-user-round"></i><span>Hồ sơ cá nhân</span>
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <form action="{{ route('logout') }}" method="POST">
+                            @csrf
+                            <button class="dropdown-item text-danger" type="submit">
+                                <i data-lucide="log-out"></i><span>Đăng xuất</span>
+                            </button>
+                        </form>
                     </div>
-
-
-                    <form action="{{ route('logout') }}" method="POST">
-
-                        @csrf
-
-                        <button class="btn btn-sm btn-light logout-button" type="submit" title="Đăng xuất"
-                            aria-label="Đăng xuất">
-
-                            <i data-lucide="log-out"></i>
-
-                        </button>
-
-                    </form>
-
                 </div>
 
             </header>
@@ -1698,7 +1721,6 @@
                             'admin.roles.index' => 'Tìm theo tên, mã hoặc mô tả vai trò',
                             'admin.permissions.index' => 'Tìm theo tên, mã hoặc mô tả quyền',
                             'admin.menus.index' => 'Tìm theo tên, mã, route hoặc quyền yêu cầu',
-                            'admin.school.teachers.index' => 'Tìm theo mã, họ tên, email hoặc chuyên môn',
                             'admin.school.grades.index' => 'Tìm theo khối, tên hoặc mô tả',
                             'admin.school.classes.index' => 'Tìm theo mã lớp, tên lớp hoặc giáo viên chủ nhiệm',
                             'admin.school.subjects.index' => 'Tìm theo mã, tên hoặc tên viết tắt môn học',
@@ -1738,7 +1760,7 @@
 
                         <p>
                             Quản lý phân quyền và cấu hình khu vực
-                            quản trị của cửa hàng.
+                            quản trị nhà trường.
                         </p>
 
                     </section>
@@ -2171,6 +2193,33 @@
 
         }
 
+        /* Dropdowns inside responsive tables are portaled to <body> while open,
+           so the table's scroll container cannot clip their actions. */
+        const tableDropdownPortals = new WeakMap();
+
+        document.addEventListener('show.bs.dropdown', (event) => {
+            const toggle = event.target;
+            const actionMenu = toggle?.closest?.('.action-menu');
+            const menu = actionMenu?.querySelector(':scope > .dropdown-menu');
+            if (!menu || tableDropdownPortals.has(toggle)) return;
+
+            const placeholder = document.createComment('action-menu-portal');
+            menu.parentNode.insertBefore(placeholder, menu);
+            menu.classList.add('dropdown-menu-portal');
+            document.body.appendChild(menu);
+            tableDropdownPortals.set(toggle, { menu, placeholder });
+        });
+
+        document.addEventListener('hidden.bs.dropdown', (event) => {
+            const toggle = event.target;
+            const portal = tableDropdownPortals.get(toggle);
+            if (!portal) return;
+
+            portal.menu.classList.remove('dropdown-menu-portal');
+            portal.placeholder.replaceWith(portal.menu);
+            tableDropdownPortals.delete(toggle);
+        });
+
 
         /*
         |--------------------------------------------------------------------------
@@ -2259,9 +2308,10 @@
         };
 
         document.querySelectorAll(
-            '[data-modal-url], [data-modal-readonly], a[href$="/create"], a[href*="/edit"], a[href*="/history"], a[href*="/transcript"], a[href*="/payments"]'
+            '[data-modal-url], [data-modal-readonly], a[href$="/create"], a[href*="/edit"], a[href*="/history"], a[href*="/transcript"]'
         ).forEach((link) => {
             link.addEventListener('click', (event) => {
+                if (link.dataset.nativeNavigation === 'true') return;
                 event.preventDefault();
                 const url = link.dataset.modalUrl || link.href;
                 if (url) {

@@ -5,7 +5,7 @@
 @section('content')
     <div class="page-heading page-heading-inline">
         <div>
-            <p class="eyebrow">RBAC</p>
+            <p class="eyebrow">Quyền truy cập</p>
             <h1>Quyền truy cập</h1>
             <p class="text-secondary mb-0">Permission kiểm soát route và các thao tác được hiển thị.</p>
         </div>

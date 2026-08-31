@@ -5,7 +5,7 @@
 @section('content')
     <div class="page-heading page-heading-inline">
         <div>
-            <p class="eyebrow">RBAC / User</p>
+            <p class="eyebrow">Tài khoản</p>
             <h1>Tài khoản</h1>
             <p class="text-secondary mb-0">Gán role để kiểm soát quyền và menu theo từng tài khoản.</p>
         </div>

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuthenticateJwt;
 use App\Http\Middleware\CheckPermission;
+use App\Http\Middleware\EnsureBackOfficeAccess;
 use App\Http\Middleware\EnsurePasswordChanged;
 use App\Http\Middleware\ResolveJwtUser;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             append: [EnsurePasswordChanged::class]
         );
         $middleware->alias([
+            'backoffice' => EnsureBackOfficeAccess::class,
             'permission' => CheckPermission::class,
             'jwt.auth' => AuthenticateJwt::class,
         ]);

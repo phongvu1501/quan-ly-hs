@@ -563,6 +563,10 @@ class SchoolController extends Controller
 
     public function studentPayments(Student $student)
     {
+        if (Schema::hasTable('fee_assessments') && Schema::hasColumn('fee_payments', 'fee_assessment_id')) {
+            return to_route('admin.finance.fees.students.show', $student);
+        }
+
         $student->load(['enrollments.class.grade', 'payments.feeNotice.academicYear', 'payments.feeNotice.semester']);
         $year = $this->currentYear();
         $classId = $student->enrollments()->where('academic_year_id', $year?->id)->value('class_id');

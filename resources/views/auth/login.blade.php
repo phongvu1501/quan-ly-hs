@@ -4,17 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đăng nhập | Quần Áo Shop</title>
+    <title>Đăng nhập | Quản lý trường học</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
             --ink: #172033;
             --muted: #687385;
             --line: #dfe6ee;
-            --canvas: #f4f7f9;
+            --canvas: #f4f6f8;
             --surface: #fff;
-            --accent: #167c80;
-            --accent-dark: #106b6e;
+            --accent: #0f6b5b;
+            --accent-dark: #0b5549;
             --danger: #b42318;
         }
 
@@ -81,13 +81,13 @@
             color: #8ed7d3;
             font-size: 12px;
             font-weight: 700;
-            letter-spacing: .08em;
+            letter-spacing: 0;
             text-transform: uppercase;
         }
 
         h1 {
             margin: 0 0 18px;
-            font-size: 42px;
+            font-size: 36px;
             line-height: 1.12;
         }
 
@@ -297,15 +297,15 @@
     <main class="shell">
 
         <section class="intro">
-            <div class="brand"><span class="brand-mark"><i data-lucide="shopping-bag"></i></span>Quản lý học sinh</div>
+            <div class="brand"><span class="brand-mark"><i data-lucide="school"></i></span>Quản lý trường học</div>
             <div class="intro-copy">
                 <p class="eyebrow">Khu vực nội bộ</p>
-                <h1>Vận hành cửa hàng gọn gàng, rõ ràng.</h1>
-                <p>Đăng nhập để theo dõi thông tin tài khoản và truy cập các công cụ được cấp quyền.</p>
+                <h1>Cổng thông tin nội bộ nhà trường.</h1>
+                <p>Không gian làm việc dành cho cán bộ, giáo viên và học sinh.</p>
             </div>
             <div class="points">
-                <div class="point"><span class="point-icon"><i data-lucide="shield-check"></i></span>Test</div>
-                <div class="point"><span class="point-icon"><i data-lucide="layout-dashboard"></i></span>Demo</div>
+                <div class="point"><span class="point-icon"><i data-lucide="shield-check"></i></span>Truy cập theo phân quyền</div>
+                <div class="point"><span class="point-icon"><i data-lucide="layout-dashboard"></i></span>Dữ liệu học vụ tập trung</div>
             </div>
         </section>
         <section class="form-side">

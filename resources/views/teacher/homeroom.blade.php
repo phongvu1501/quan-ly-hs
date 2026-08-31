@@ -57,8 +57,14 @@
                             <h2 class="panel-title mb-1">{{ $class->name }}</h2><small
                                 class="text-secondary">{{ $class->grade?->name }} · {{ $class->room ?: 'Chưa xếp phòng' }}
                                 · {{ $class->enrollments_count }} học sinh</small>
-                        </div><a href="{{ route('teacher.attendance', ['class_id' => $class->id]) }}"
-                            class="btn btn-sm btn-light"><i data-lucide="clipboard-check"></i> Điểm danh</a>
+                        </div>
+                        <div class="d-flex flex-wrap justify-content-end gap-2">
+                            <a href="{{ route('teacher.attendance', ['class_id' => $class->id]) }}"
+                                class="btn btn-sm btn-light"><i data-lucide="clipboard-check"></i> Điểm danh</a>
+                            @if (auth()->user()->hasPermission('scores.view'))
+                                <a href="{{ route('teacher.scores') }}" class="btn btn-sm btn-light"><i data-lucide="square-pen"></i> Sổ điểm</a>
+                            @endif
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
