@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Models\AcademicYear;
+use App\Models\Enrollment;
 use App\Models\Guardian;
 use App\Models\Role;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -41,6 +43,12 @@ class StudentService
     /** @param array<string, mixed> $input */
     public function create(array $input): Student
     {
+        if (($input['status'] ?? null) === Student::STATUS_GRADUATED) {
+            throw ValidationException::withMessages([
+                'status' => 'Không thể tạo mới học sinh ở trạng thái "Đã tốt nghiệp". Trạng thái này chỉ được cập nhật sau khi hoàn thành năm học lớp 12.',
+            ]);
+        }
+
         $newAvatarPath = $this->storeAvatar($input['avatar'] ?? null);
 
         try {
@@ -70,6 +78,7 @@ class StudentService
     public function update(Student $student, array $input): Student
     {
         $this->assertStatusTransition($student->status, (string) $input['status']);
+        $this->assertGraduationEligibility($student, $student->status, (string) $input['status'], today());
         $newAvatarPath = $this->storeAvatar($input['avatar'] ?? null);
         $oldAvatarPath = $student->avatar_path;
 
@@ -77,6 +86,8 @@ class StudentService
             $updated = DB::transaction(function () use ($student, $input, $newAvatarPath): Student {
                 $locked = Student::query()->lockForUpdate()->findOrFail($student->id);
                 $oldStatus = $locked->status;
+                $this->assertStatusTransition($oldStatus, (string) $input['status']);
+                $this->assertGraduationEligibility($locked, $oldStatus, (string) $input['status'], today());
                 $attributes = Arr::only($input, self::PROFILE_FIELDS);
                 if ($newAvatarPath) {
                     $attributes['avatar_path'] = $newAvatarPath;
@@ -176,6 +187,28 @@ class StudentService
         });
     }
 
+    public function canGraduate(Student $student, ?Carbon $effectiveDate = null): bool
+    {
+        $effectiveDate ??= today();
+        $latestEnrollment = $student->enrollments()
+            ->with(['academicYear', 'class.grade'])
+            ->join('academic_years', 'academic_years.id', '=', 'enrollments.academic_year_id')
+            ->select('enrollments.*')
+            ->orderByDesc('academic_years.ends_on')
+            ->orderByDesc('enrollments.id')
+            ->first();
+
+        if (! $latestEnrollment
+            || (int) $latestEnrollment->class?->grade?->level !== 12
+            || ! in_array($latestEnrollment->status, [Enrollment::STATUS_ACTIVE, Enrollment::STATUS_COMPLETED], true)) {
+            return false;
+        }
+
+        $academicYearEnd = $latestEnrollment->academicYear?->ends_on;
+
+        return $academicYearEnd !== null && $academicYearEnd->startOfDay()->lt($effectiveDate->copy()->startOfDay());
+    }
+
     /** @return array<string, mixed> */
     public function detailData(Student $student): array
     {
@@ -230,6 +263,23 @@ class StudentService
         }
     }
 
+    private function assertGraduationEligibility(
+        Student $student,
+        string $from,
+        string $to,
+        Carbon $effectiveDate
+    ): void {
+        if ($from === Student::STATUS_GRADUATED || $to !== Student::STATUS_GRADUATED) {
+            return;
+        }
+
+        if (! $this->canGraduate($student, $effectiveDate)) {
+            throw ValidationException::withMessages([
+                'status' => 'Chỉ được chuyển sang "Đã tốt nghiệp" sau khi học sinh hoàn thành năm học lớp 12. Năm học lớp 12 phải đã kết thúc.',
+            ]);
+        }
+    }
+
     private function createAccount(Student $student): User
     {
         $user = User::create([
@@ -264,6 +314,7 @@ class StudentService
                 if ($guardian) {
                     $student->guardians()->detach($guardian->id);
                 }
+
                 continue;
             }
             if (blank($payload['full_name'] ?? null)) {
@@ -272,7 +323,7 @@ class StudentService
                 ]);
             }
 
-            $guardian ??= new Guardian();
+            $guardian ??= new Guardian;
             $guardian->fill($payload)->save();
             $student->guardians()->syncWithoutDetaching([
                 $guardian->id => [

@@ -6,7 +6,6 @@ use App\Models\AcademicYear;
 use App\Models\AttendanceRecord;
 use App\Models\Enrollment;
 use App\Models\Grade;
-use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Schedule;
 use App\Models\SchoolClass;
@@ -22,6 +21,7 @@ use App\Services\StudentService;
 use App\Services\TeacherService;
 use App\Services\TeachingAssignmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -123,12 +123,90 @@ class StudentTeacherLifecycleTest extends TestCase
 
         app(StudentService::class)->update($student, [
             'full_name' => $student->full_name,
-            'status' => Student::STATUS_GRADUATED,
+            'status' => Student::STATUS_DROPPED,
         ]);
-        $this->assertDatabaseHas('students', ['id' => $student->id, 'status' => Student::STATUS_GRADUATED]);
-        $this->assertDatabaseHas('enrollments', ['id' => $enrollment->id, 'status' => Enrollment::STATUS_COMPLETED]);
+        $this->assertDatabaseHas('students', ['id' => $student->id, 'status' => Student::STATUS_DROPPED]);
+        $this->assertDatabaseHas('enrollments', ['id' => $enrollment->id, 'status' => Enrollment::STATUS_WITHDRAWN]);
         $this->assertDatabaseHas('scores', ['student_id' => $student->id]);
         $this->assertDatabaseHas('attendance_records', ['student_id' => $student->id]);
+    }
+
+    public function test_graduation_requires_the_grade_twelve_year_to_be_finished(): void
+    {
+        $year = AcademicYear::create([
+            'name' => '2026-2027', 'code' => 'GRAD-2026-2027',
+            'starts_on' => '2026-08-01', 'ends_on' => '2027-05-31', 'is_current' => true,
+        ]);
+        $service = app(StudentService::class);
+        $gradeTwelveStudent = null;
+        $gradeTwelveEnrollment = null;
+
+        try {
+            $service->create([
+                'full_name' => 'Invalid Graduate',
+                'status' => Student::STATUS_GRADUATED,
+            ]);
+            $this->fail('Expected direct graduated student creation rejection.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('status', $exception->errors());
+        }
+
+        Carbon::setTestNow('2026-09-01 08:00:00');
+        try {
+            foreach ([10, 11, 12] as $level) {
+                $grade = Grade::create(['level' => $level, 'name' => "Khối {$level}"]);
+                $class = SchoolClass::create([
+                    'academic_year_id' => $year->id,
+                    'grade_id' => $grade->id,
+                    'code' => "GRAD-{$level}A1",
+                    'name' => "{$level}A1",
+                    'status' => 'active',
+                ]);
+                $student = Student::create([
+                    'full_name' => "Student {$level}",
+                    'status' => Student::STATUS_STUDYING,
+                ]);
+                $enrollment = Enrollment::create([
+                    'student_id' => $student->id,
+                    'academic_year_id' => $year->id,
+                    'class_id' => $class->id,
+                    'status' => Enrollment::STATUS_ACTIVE,
+                ]);
+
+                try {
+                    $service->update($student, [
+                        'full_name' => $student->full_name,
+                        'status' => Student::STATUS_GRADUATED,
+                    ]);
+                    $this->fail("Expected grade {$level} graduation rejection.");
+                } catch (ValidationException $exception) {
+                    $this->assertArrayHasKey('status', $exception->errors());
+                }
+
+                $this->assertSame(Student::STATUS_STUDYING, $student->fresh()->status);
+                $this->assertSame(Enrollment::STATUS_ACTIVE, $enrollment->fresh()->status);
+                if ($level === 12) {
+                    $gradeTwelveStudent = $student;
+                    $gradeTwelveEnrollment = $enrollment;
+                }
+            }
+
+            Carbon::setTestNow('2027-05-31 23:59:59');
+            $this->assertFalse($service->canGraduate($gradeTwelveStudent));
+
+            Carbon::setTestNow('2027-06-01 00:00:01');
+            $this->assertTrue($service->canGraduate($gradeTwelveStudent));
+            $service->update($gradeTwelveStudent, [
+                'full_name' => $gradeTwelveStudent->full_name,
+                'status' => Student::STATUS_GRADUATED,
+            ]);
+
+            $this->assertSame(Student::STATUS_GRADUATED, $gradeTwelveStudent->fresh()->status);
+            $this->assertSame(Enrollment::STATUS_COMPLETED, $gradeTwelveEnrollment->fresh()->status);
+            $this->assertSame('2027-06-01', $gradeTwelveEnrollment->fresh()->left_on->toDateString());
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_teacher_assignment_requires_active_qualified_teacher_and_duplicate_is_blocked(): void

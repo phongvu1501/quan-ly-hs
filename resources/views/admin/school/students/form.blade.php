@@ -3,6 +3,11 @@
 @php($isEditing = isset($student))
 @php($enrollment = $student?->enrollments?->first())
 @php($guardianByRelationship = $student?->guardians?->keyBy('pivot.relationship') ?? collect())
+@php($canGraduate = $canGraduate ?? false)
+@php($selectedStudentStatus = old('status', $student?->status ?: \App\Models\Student::STATUS_STUDYING))
+@if ($selectedStudentStatus === \App\Models\Student::STATUS_GRADUATED && ! $canGraduate)
+    @php($selectedStudentStatus = $student?->status ?: \App\Models\Student::STATUS_STUDYING)
+@endif
 
 @section('title', $isEditing ? 'Sửa học sinh' : 'Thêm học sinh')
 
@@ -93,10 +98,15 @@
                                 class="form-select @error('status') is-invalid @enderror" required
                                 @error('status') aria-invalid="true" @enderror>
                                 @foreach (\App\Models\Student::STATUS_LABELS as $value => $label)
-                                    <option value="{{ $value }}" @selected(old('status', $student?->status ?: 'studying') === $value)>{{ $label }}</option>
+                                    @continue(! $isEditing && $value === \App\Models\Student::STATUS_GRADUATED)
+                                    <option value="{{ $value }}" @selected($selectedStudentStatus === $value)
+                                        @disabled($value === \App\Models\Student::STATUS_GRADUATED && ! $canGraduate)>{{ $label }}</option>
                                 @endforeach
                             </select>
                             @error('status')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            @if ($isEditing && $student->status !== \App\Models\Student::STATUS_GRADUATED && ! $canGraduate)
+                                <div class="form-text">Chỉ có thể chọn “Đã tốt nghiệp” sau khi năm học lớp 12 đã kết thúc.</div>
+                            @endif
                         </div>
                     </div>
                 </x-admin.form-section>

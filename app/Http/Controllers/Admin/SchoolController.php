@@ -16,8 +16,8 @@ use App\Models\ConductEvaluation;
 use App\Models\Exam;
 use App\Models\ExamInvigilation;
 use App\Models\ExamResult;
-use App\Models\FeeNotice;
 use App\Models\FeeAssessment;
+use App\Models\FeeNotice;
 use App\Models\FeePayment;
 use App\Models\Grade;
 use App\Models\Guardian;
@@ -32,26 +32,27 @@ use App\Models\SubjectResult;
 use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use App\Models\User;
-use App\Support\Decimal;
 use App\Notifications\ExamInvigilationAssigned;
 use App\Services\HomeroomAssignmentService;
 use App\Services\StudentService;
 use App\Services\TeacherService;
 use App\Services\TeachingAssignmentService;
+use App\Support\Decimal;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class SchoolController extends Controller
 {
-
-
+    /**
+     * Trang tổng quan trường học: thống kê số liệu học sinh, học phí, điểm số, attendance và kế hoạch giảng dạy.
+     */
     public function dashboard(Request $request)
     {
 
@@ -73,7 +74,6 @@ class SchoolController extends Controller
         $filterClassId = $request->filled('class_id')
             ? (int) $request->input('class_id')
             : null;
-
 
         $filterDateFrom = $request->filled('date_from')
             ? Carbon::parse($request->input('date_from'))->startOfDay()
@@ -97,14 +97,14 @@ class SchoolController extends Controller
 
         $classScope = SchoolClass::query()
             ->where('status', 'active')
-            ->when($filterAcademicYearId, fn($query) => $query->where('academic_year_id', $filterAcademicYearId))
-            ->when($filterGradeId, fn($query) => $query->where('grade_id', $filterGradeId))
-            ->when($filterClassId, fn($query) => $query->whereKey($filterClassId));
+            ->when($filterAcademicYearId, fn ($query) => $query->where('academic_year_id', $filterAcademicYearId))
+            ->when($filterGradeId, fn ($query) => $query->where('grade_id', $filterGradeId))
+            ->when($filterClassId, fn ($query) => $query->whereKey($filterClassId));
 
         $classesFilter = DB::table('classes')
             ->select('id', 'name', 'grade_id')
             ->where('status', 'active')
-            ->when($filterAcademicYearId, fn($query) => $query->where('academic_year_id', $filterAcademicYearId))
+            ->when($filterAcademicYearId, fn ($query) => $query->where('academic_year_id', $filterAcademicYearId))
             ->orderBy('name')
             ->get();
 
@@ -142,7 +142,6 @@ class SchoolController extends Controller
             ->groupBy('classes.id')
             ->pluck('total', 'classes.id');
 
-
         $gradeBreakdownQuery = DB::table('enrollments')
             ->join('classes', 'classes.id', '=', 'enrollments.class_id')
             ->join('grades', 'grades.id', '=', 'classes.grade_id')
@@ -170,17 +169,17 @@ class SchoolController extends Controller
 
         $attendance = $filterAcademicYearId
             ? AttendanceRecord::where('academic_year_id', $filterAcademicYearId)
-            ->whereIn('class_id', $filteredClassIds)
-            ->whereBetween('attended_on', [
-                $filterDateFrom->toDateString(),
-                $filterDateTo->toDateString(),
-            ])
-            ->select(
-                'status',
-                DB::raw('count(*) as total')
-            )
-            ->groupBy('status')
-            ->pluck('total', 'status')
+                ->whereIn('class_id', $filteredClassIds)
+                ->whereBetween('attended_on', [
+                    $filterDateFrom->toDateString(),
+                    $filterDateTo->toDateString(),
+                ])
+                ->select(
+                    'status',
+                    DB::raw('count(*) as total')
+                )
+                ->groupBy('status')
+                ->pluck('total', 'status')
             : collect();
 
         $attendanceDetails = $filterAcademicYearId
@@ -209,7 +208,7 @@ class SchoolController extends Controller
                 ->groupBy('attended_on', 'status')
                 ->orderBy('attended_on')
                 ->get()
-                ->groupBy(fn($row) => Carbon::parse($row->attended_on)->format('Y-m-d'))
+                ->groupBy(fn ($row) => Carbon::parse($row->attended_on)->format('Y-m-d'))
                 ->map(function ($rows, string $date): array {
                     $counts = $rows->pluck('total', 'status');
 
@@ -226,14 +225,13 @@ class SchoolController extends Controller
                 ->values()
             : collect();
 
-
         $teachers = Teacher::where('status', 'active')
             ->when($filterAcademicYearId, function ($query) use ($filterAcademicYearId, $filteredClassIds): void {
                 $query->where(function ($query) use ($filterAcademicYearId, $filteredClassIds): void {
-                    $query->whereHas('assignments', fn($assignment) => $assignment
+                    $query->whereHas('assignments', fn ($assignment) => $assignment
                         ->where('academic_year_id', $filterAcademicYearId)
                         ->whereIn('class_id', $filteredClassIds))
-                        ->orWhereHas('homeroomClasses', fn($class) => $class
+                        ->orWhereHas('homeroomClasses', fn ($class) => $class
                             ->where('academic_year_id', $filterAcademicYearId)
                             ->whereIn('id', $filteredClassIds));
                 });
@@ -260,15 +258,15 @@ class SchoolController extends Controller
 
         $scoreRatings = collect([
             'excellent' => $scoreAverageDetails->where('average_score', '>=', 8)->count(),
-            'good' => $scoreAverageDetails->filter(fn($row) => $row->average_score >= 6.5 && $row->average_score < 8)->count(),
-            'average' => $scoreAverageDetails->filter(fn($row) => $row->average_score >= 5 && $row->average_score < 6.5)->count(),
+            'good' => $scoreAverageDetails->filter(fn ($row) => $row->average_score >= 6.5 && $row->average_score < 8)->count(),
+            'average' => $scoreAverageDetails->filter(fn ($row) => $row->average_score >= 5 && $row->average_score < 6.5)->count(),
             'weak' => $scoreAverageDetails->where('average_score', '<', 5)->count(),
         ]);
 
         $scoreCount = $filterAcademicYearId
             ? Score::where('academic_year_id', $filterAcademicYearId)
-            ->whereIn('class_id', $filteredClassIds)
-            ->count()
+                ->whereIn('class_id', $filteredClassIds)
+                ->count()
             : 0;
 
         $financeSchemaReady = Schema::hasTable('fee_assessments');
@@ -292,7 +290,9 @@ class SchoolController extends Controller
             : collect();
 
         $feeBreakdown = $feeNotices->map(function (FeeNotice $notice) use (
-            $activeStudents, $studentCountsByClass, $financeSchemaReady
+            $activeStudents,
+            $studentCountsByClass,
+            $financeSchemaReady
         ): array {
             if ($financeSchemaReady && ! $notice->isLegacy()) {
                 $assessments = $notice->assessments;
@@ -336,13 +336,13 @@ class SchoolController extends Controller
         $classOverview = (clone $classScope)
             ->with(['grade', 'homeroomTeacher'])
             ->withCount([
-                'enrollments as active_students_count' => fn($query) => $query
+                'enrollments as active_students_count' => fn ($query) => $query
                     ->where('academic_year_id', $filterAcademicYearId)
                     ->where('status', 'active'),
-                'assignments as active_assignments_count' => fn($query) => $query
+                'assignments as active_assignments_count' => fn ($query) => $query
                     ->where('academic_year_id', $filterAcademicYearId)
                     ->where('status', 'active'),
-                'schedules as scheduled_periods_count' => fn($query) => $query
+                'schedules as scheduled_periods_count' => fn ($query) => $query
                     ->where('academic_year_id', $filterAcademicYearId),
             ])
             ->orderBy('name')
@@ -366,7 +366,7 @@ class SchoolController extends Controller
         ])
             ->when(
                 $filterAcademicYearId,
-                fn($query) => $query->where(
+                fn ($query) => $query->where(
                     'academic_year_id',
                     $filterAcademicYearId
                 )
@@ -380,7 +380,6 @@ class SchoolController extends Controller
             )
             ->orderBy('exam_date')
             ->limit(30);
-
 
         if ($filterClassId) {
             $upcomingExamsQuery->where('class_id', $filterClassId);
@@ -397,7 +396,7 @@ class SchoolController extends Controller
         $examCountQuery = Exam::query()
             ->when(
                 $filterAcademicYearId,
-                fn($query) => $query->where(
+                fn ($query) => $query->where(
                     'academic_year_id',
                     $filterAcademicYearId
                 )
@@ -472,8 +471,9 @@ class SchoolController extends Controller
         ]);
     }
 
-
-
+    /**
+     * Hiển thị danh sách học sinh theo bộ lọc tìm kiếm, năm học và lớp.
+     */
     public function students(Request $request, StudentService $studentService)
     {
         $search = trim((string) $request->input('q', ''));
@@ -481,22 +481,22 @@ class SchoolController extends Controller
         $classId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
         $status = trim((string) $request->input('status', ''));
         $admissionYear = trim((string) $request->input('admission_year', ''));
-        $students = Student::with(['enrollments' => fn($query) => $query
+        $students = Student::with(['enrollments' => fn ($query) => $query
             ->with('class.grade', 'academicYear')
             ->where('status', 'active')
             ->latest('id')])
             ->withExists(StudentService::historyExistenceColumns())
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('student_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%");
             }))
-            ->when($status !== '', fn($query) => $query->where('status', $status))
-            ->when($admissionYear !== '', fn($query) => $query->where('admission_year', $admissionYear))
-            ->when($yearId || $classId, fn($query) => $query->whereHas('enrollments', function ($enrollment) use ($yearId, $classId): void {
-                $enrollment->when($yearId, fn($q) => $q->where('academic_year_id', $yearId))
-                    ->when($classId, fn($q) => $q->where('class_id', $classId));
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($admissionYear !== '', fn ($query) => $query->where('admission_year', $admissionYear))
+            ->when($yearId || $classId, fn ($query) => $query->whereHas('enrollments', function ($enrollment) use ($yearId, $classId): void {
+                $enrollment->when($yearId, fn ($q) => $q->where('academic_year_id', $yearId))
+                    ->when($classId, fn ($q) => $q->where('class_id', $classId));
             }))
             ->orderBy('full_name')
             ->paginate(15)
@@ -512,6 +512,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo hồ sơ học sinh mới.
+     */
     public function createStudent()
     {
         return view('admin.school.students.form', [
@@ -521,6 +524,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Lưu thông tin học sinh mới và tạo tài khoản đăng nhập mặc định cho học sinh.
+     */
     public function storeStudent(StoreStudentRequest $request, StudentService $studentService)
     {
         $student = $studentService->create($request->validated());
@@ -528,25 +534,35 @@ class SchoolController extends Controller
         return to_route('admin.school.students.index')->with('success', "Đã tạo học sinh và tài khoản {$student->email}. Mật khẩu mặc định: 123456. Học sinh phải đổi mật khẩu khi đăng nhập lần đầu.");
     }
 
+    /**
+     * Hiển thị chi tiết hồ sơ học sinh và dữ liệu liên quan như học phí, điểm, phụ huynh.
+     */
     public function showStudent(Student $student, StudentService $studentService)
     {
         return view('admin.school.students.show', $studentService->detailData($student));
     }
 
-    public function editStudent(Student $student)
+    /**
+     * Mở form chỉnh sửa hồ sơ học sinh cùng dữ liệu tuyển sinh và phụ huynh đang hoạt động.
+     */
+    public function editStudent(Student $student, StudentService $studentService)
     {
         $student->load([
-            'enrollments' => fn($query) => $query->where('status', 'active')->latest('academic_year_id'),
+            'enrollments' => fn ($query) => $query->where('status', 'active')->latest('academic_year_id'),
             'guardians',
         ]);
 
         return view('admin.school.students.form', [
             'student' => $student,
+            'canGraduate' => $student->status === Student::STATUS_GRADUATED || $studentService->canGraduate($student),
             'years' => AcademicYear::orderByDesc('starts_on')->get(),
             'classes' => SchoolClass::with('grade', 'academicYear')->where('status', 'active')->orderByDesc('academic_year_id')->orderBy('name')->get(),
         ]);
     }
 
+    /**
+     * Cập nhật hồ sơ học sinh và đồng bộ thông tin nhập học, phụ huynh và tài khoản liên quan.
+     */
     public function updateStudent(UpdateStudentRequest $request, Student $student, StudentService $studentService)
     {
         $studentService->update($student, $request->validated());
@@ -554,6 +570,9 @@ class SchoolController extends Controller
         return to_route('admin.school.students.index')->with('success', 'Đã cập nhật hồ sơ học sinh.');
     }
 
+    /**
+     * Xóa hồ sơ học sinh sau khi kiểm tra điều kiện đủ tiêu chí và tiến hành xử lý nghiệp vụ liên quan.
+     */
     public function destroyStudent(Student $student, StudentService $studentService)
     {
         $studentService->delete($student);
@@ -561,6 +580,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa học sinh.');
     }
 
+    /**
+     * Hiển thị lịch sử thu học phí của học sinh ở chế độ legacy hoặc chuyển hướng sang finance module mới.
+     */
     public function studentPayments(Student $student)
     {
         if (Schema::hasTable('fee_assessments') && Schema::hasColumn('fee_payments', 'fee_assessment_id')) {
@@ -572,8 +594,8 @@ class SchoolController extends Controller
         $classId = $student->enrollments()->where('academic_year_id', $year?->id)->value('class_id');
         $notices = FeeNotice::where('academic_year_id', $year?->id)
             ->where('is_active', true)
-            ->where(fn($query) => $query->whereNull('class_id')->orWhere('class_id', $classId))
-            ->with(['payments' => fn($query) => $query->where('student_id', $student->id)])
+            ->where(fn ($query) => $query->whereNull('class_id')->orWhere('class_id', $classId))
+            ->with(['payments' => fn ($query) => $query->where('student_id', $student->id)])
             ->latest()
             ->get();
 
@@ -582,6 +604,9 @@ class SchoolController extends Controller
         return view('admin.school.students.payments', compact('student', 'year', 'notices', 'legacyReadOnly'));
     }
 
+    /**
+     * Ghi nhận hoặc cập nhật giao dịch thanh toán học phí cho học sinh.
+     */
     public function storeStudentPayment(Request $request, Student $student)
     {
         if (Schema::hasColumn('fee_payments', 'fee_assessment_id')) {
@@ -619,6 +644,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã cập nhật lịch sử đóng tiền.');
     }
 
+    /**
+     * Hiển thị bảng điểm, kết quả học tập, đánh giá hạnh kiểm và thống kê điểm danh theo từng năm học của học sinh.
+     */
     public function studentTranscript(Student $student)
     {
         $enrollments = $student->enrollments()
@@ -674,6 +702,9 @@ class SchoolController extends Controller
         ));
     }
 
+    /**
+     * Hiển thị danh sách giáo viên với bộ lọc tìm kiếm, trạng thái, phân loại và năm học.
+     */
     public function teachers(Request $request, TeacherService $teacherService)
     {
         $search = trim((string) $request->input('q', ''));
@@ -683,31 +714,31 @@ class SchoolController extends Controller
         $classId = $request->filled('class_id') ? (int) $request->input('class_id') : null;
         $teachers = Teacher::withCount(['homeroomClasses', 'assignments'])
             ->withExists(TeacherService::historyExistenceColumns())
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('teacher_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('specialization', 'like', "%{$search}%");
             }))
-            ->when($status !== '', fn($query) => $query->where('status', $status))
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($yearId || $classId, function ($query) use ($yearId, $classId): void {
                 $query->where(function ($query) use ($yearId, $classId): void {
                     $query->whereHas('assignments', function ($assignment) use ($yearId, $classId): void {
-                        $assignment->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-                            ->when($classId, fn($query) => $query->where('class_id', $classId));
+                        $assignment->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+                            ->when($classId, fn ($query) => $query->where('class_id', $classId));
                     })->orWhereHas('homeroomClasses', function ($class) use ($yearId, $classId): void {
-                        $class->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-                            ->when($classId, fn($query) => $query->whereKey($classId));
+                        $class->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+                            ->when($classId, fn ($query) => $query->whereKey($classId));
                     });
                 });
             })
-            ->when($type === 'homeroom', fn($query) => $query->whereHas('homeroomClasses', function ($class) use ($yearId, $classId): void {
-                $class->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-                    ->when($classId, fn($query) => $query->whereKey($classId));
+            ->when($type === 'homeroom', fn ($query) => $query->whereHas('homeroomClasses', function ($class) use ($yearId, $classId): void {
+                $class->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+                    ->when($classId, fn ($query) => $query->whereKey($classId));
             }))
-            ->when($type === 'subject', fn($query) => $query->whereHas('assignments', function ($assignment) use ($yearId, $classId): void {
-                $assignment->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-                    ->when($classId, fn($query) => $query->where('class_id', $classId));
+            ->when($type === 'subject', fn ($query) => $query->whereHas('assignments', function ($assignment) use ($yearId, $classId): void {
+                $assignment->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+                    ->when($classId, fn ($query) => $query->where('class_id', $classId));
             }))
             ->orderBy('full_name')
             ->paginate(15)
@@ -723,6 +754,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo mới hồ sơ giáo viên.
+     */
     public function createTeacher()
     {
         return view('admin.school.teachers.form', [
@@ -733,19 +767,22 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Liệt kê giáo viên làm chủ nhiệm theo tìm kiếm và năm học.
+     */
     public function homeroomTeachers(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
         $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
-        $teachers = Teacher::with(['homeroomClasses' => fn($query) => $query
+        $teachers = Teacher::with(['homeroomClasses' => fn ($query) => $query
             ->with(['academicYear', 'grade'])
-            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))])
-            ->whereHas('homeroomClasses', fn($query) => $query
-                ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId)))
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))])
+            ->whereHas('homeroomClasses', fn ($query) => $query
+                ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId)))
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('teacher_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
-                    ->orWhereHas('homeroomClasses', fn($class) => $class
+                    ->orWhereHas('homeroomClasses', fn ($class) => $class
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%"));
             }))
@@ -759,19 +796,22 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Liệt kê giáo viên dạy theo môn và lọc theo năm học.
+     */
     public function subjectTeachers(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
         $yearId = $request->filled('academic_year_id') ? (int) $request->input('academic_year_id') : null;
-        $teachers = Teacher::with(['assignments' => fn($query) => $query
+        $teachers = Teacher::with(['assignments' => fn ($query) => $query
             ->with(['academicYear', 'semester', 'class.grade', 'subject'])
-            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))])
-            ->whereHas('assignments', fn($query) => $query
-                ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId)))
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))])
+            ->whereHas('assignments', fn ($query) => $query
+                ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId)))
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('teacher_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
-                    ->orWhereHas('assignments.subject', fn($subject) => $subject
+                    ->orWhereHas('assignments.subject', fn ($subject) => $subject
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%"));
             }))
@@ -785,6 +825,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Tạo hồ sơ giáo viên mới và cấp tài khoản đăng nhập mặc định.
+     */
     public function storeTeacher(StoreTeacherRequest $request, TeacherService $teacherService)
     {
         $teacher = $teacherService->create($request->validated());
@@ -792,11 +835,17 @@ class SchoolController extends Controller
         return to_route('admin.school.teachers.index')->with('success', "Đã tạo giáo viên và tài khoản {$teacher->email}. Mật khẩu mặc định: 123456. Giáo viên phải đổi mật khẩu khi đăng nhập lần đầu.");
     }
 
+    /**
+     * Hiển thị thông tin chi tiết giáo viên kèm lịch sử giảng dạy, chủ nhiệm và phân công.
+     */
     public function showTeacher(Teacher $teacher, TeacherService $teacherService)
     {
         return view('admin.school.teachers.show', $teacherService->detailData($teacher));
     }
 
+    /**
+     * Mở form chỉnh sửa hồ sơ giáo viên.
+     */
     public function editTeacher(Teacher $teacher)
     {
         $teacher->load(['subjects', 'homeroomClasses']);
@@ -809,6 +858,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Hiển thị lịch sử công tác của giáo viên: môn dạy, chủ nhiệm, lịch, coi thi và năm học liên quan.
+     */
     public function teacherHistory(Teacher $teacher)
     {
         $assignments = $teacher->assignments()
@@ -832,9 +884,9 @@ class SchoolController extends Controller
             ->with(['exam.academicYear', 'exam.semester', 'exam.subject', 'exam.class'])
             ->whereHas('exam')
             ->get()
-            ->sortByDesc(fn($assignment) => $assignment->exam?->exam_date?->format('Y-m-d') . ' ' . ($assignment->exam?->starts_at ?? ''))
+            ->sortByDesc(fn ($assignment) => $assignment->exam?->exam_date?->format('Y-m-d').' '.($assignment->exam?->starts_at ?? ''))
             ->values();
-        $subjectYears = $teacher->subjects->groupBy(fn($subject) => $subject->pivot->academic_year_id);
+        $subjectYears = $teacher->subjects->groupBy(fn ($subject) => $subject->pivot->academic_year_id);
         $yearIds = collect()
             ->merge($assignments->pluck('academic_year_id'))
             ->merge($homeroomAssignments->pluck('academic_year_id'))
@@ -858,6 +910,9 @@ class SchoolController extends Controller
         ));
     }
 
+    /**
+     * Cập nhật hồ sơ giáo viên và đồng bộ vai trò, môn dạy và phân công liên quan.
+     */
     public function updateTeacher(UpdateTeacherRequest $request, Teacher $teacher, TeacherService $teacherService)
     {
         $teacherService->update($teacher, $request->validated());
@@ -865,6 +920,9 @@ class SchoolController extends Controller
         return to_route('admin.school.teachers.index')->with('success', 'Đã cập nhật hồ sơ giáo viên.');
     }
 
+    /**
+     * Xóa hoặc ngưng hiệu lực giáo viên sau khi kiểm tra lịch sử công tác và trách nhiệm đang hoạt động.
+     */
     public function destroyTeacher(Teacher $teacher, TeacherService $teacherService)
     {
         $teacherService->delete($teacher);
@@ -872,17 +930,20 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa giáo viên.');
     }
 
+    /**
+     * Hiển thị danh sách khối lớp theo tên, cấp độ và bộ lọc tìm kiếm.
+     */
     public function grades(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
         $level = $request->filled('level') ? (int) $request->input('level') : null;
         $grades = Grade::withCount('classes')
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('level', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
             }))
-            ->when($level, fn($query) => $query->where('level', $level))
+            ->when($level, fn ($query) => $query->where('level', $level))
             ->orderBy('level')
             ->paginate(15)
             ->withQueryString();
@@ -893,11 +954,17 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo khối lớp mới.
+     */
     public function createGrade()
     {
         return view('admin.school.grades.form', ['grade' => null]);
     }
 
+    /**
+     * Lưu khối lớp mới sau khi validate dữ liệu và ràng buộc mức học.
+     */
     public function storeGrade(Request $request)
     {
         Grade::create($request->validate([
@@ -909,11 +976,17 @@ class SchoolController extends Controller
         return to_route('admin.school.grades.index')->with('success', 'Đã tạo khối lớp.');
     }
 
+    /**
+     * Mở form chỉnh sửa khối lớp.
+     */
     public function editGrade(Grade $grade)
     {
         return view('admin.school.grades.form', compact('grade'));
     }
 
+    /**
+     * Cập nhật thông tin khối lớp và kiểm tra tính duy nhất của cấp độ.
+     */
     public function updateGrade(Request $request, Grade $grade)
     {
         $grade->update($request->validate([
@@ -925,6 +998,9 @@ class SchoolController extends Controller
         return to_route('admin.school.grades.index')->with('success', 'Đã cập nhật khối lớp.');
     }
 
+    /**
+     * Xóa khối lớp khi chưa có lớp nào đang dùng.
+     */
     public function destroyGrade(Grade $grade)
     {
         if ($grade->classes()->exists()) {
@@ -935,18 +1011,21 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa khối lớp.');
     }
 
+    /**
+     * Hiển thị danh sách môn học và lọc theo trạng thái hoạt động.
+     */
     public function subjects(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
         $active = $request->input('active', '');
         $subjects = Subject::withCount(['assignments'])
             ->with(['assignments.teacher'])
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
                     ->orWhere('short_name', 'like', "%{$search}%");
             }))
-            ->when($active !== '', fn($query) => $query->where('is_active', $active === 'active'))
+            ->when($active !== '', fn ($query) => $query->where('is_active', $active === 'active'))
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
@@ -957,11 +1036,17 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo môn học mới.
+     */
     public function createSubject()
     {
         return view('admin.school.subjects.form', ['subject' => null]);
     }
 
+    /**
+     * Lưu thông tin môn học mới và áp dụng các quy tắc mã môn, số tiết và trạng thái hoạt động.
+     */
     public function storeSubject(Request $request)
     {
         Subject::create($request->validate([
@@ -976,11 +1061,17 @@ class SchoolController extends Controller
         return to_route('admin.school.subjects.index')->with('success', 'Đã tạo môn học.');
     }
 
+    /**
+     * Mở form chỉnh sửa môn học.
+     */
     public function editSubject(Subject $subject)
     {
         return view('admin.school.subjects.form', compact('subject'));
     }
 
+    /**
+     * Cập nhật thông tin môn học với validation mã môn và cấu hình học tập.
+     */
     public function updateSubject(Request $request, Subject $subject)
     {
         $subject->update($request->validate([
@@ -995,6 +1086,9 @@ class SchoolController extends Controller
         return to_route('admin.school.subjects.index')->with('success', 'Đã cập nhật môn học.');
     }
 
+    /**
+     * Xóa môn học khi chưa có phân công giảng dạy nào liên quan.
+     */
     public function destroySubject(Subject $subject)
     {
         if ($subject->assignments()->exists()) {
@@ -1005,6 +1099,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa môn học.');
     }
 
+    /**
+     * Hiển thị danh sách lớp học với các bộ lọc năm học, khối, trạng thái và tìm kiếm.
+     */
     public function classes(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
@@ -1012,16 +1109,16 @@ class SchoolController extends Controller
         $gradeId = $request->filled('grade_id') ? (int) $request->input('grade_id') : null;
         $status = trim((string) $request->input('status', ''));
         $classes = SchoolClass::with(['academicYear', 'grade', 'homeroomTeacher'])
-            ->withCount(['enrollments' => fn($query) => $query->where('status', 'active')])
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->withCount(['enrollments' => fn ($query) => $query->where('status', 'active')])
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhereHas('grade', fn($grade) => $grade->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('homeroomTeacher', fn($teacher) => $teacher->where('full_name', 'like', "%{$search}%"));
+                    ->orWhereHas('grade', fn ($grade) => $grade->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('homeroomTeacher', fn ($teacher) => $teacher->where('full_name', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-            ->when($gradeId, fn($query) => $query->where('grade_id', $gradeId))
-            ->when($status !== '', fn($query) => $query->where('status', $status))
+            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+            ->when($gradeId, fn ($query) => $query->where('grade_id', $gradeId))
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->orderByDesc('academic_year_id')
             ->orderBy('name')
             ->paginate(15)
@@ -1035,6 +1132,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo lớp học mới.
+     */
     public function createClass()
     {
         return view('admin.school.classes.form', [
@@ -1045,6 +1145,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Hiển thị danh sách học sinh đang học trong một lớp và cho phép lọc theo từ khóa.
+     */
     public function classStudents(Request $request, SchoolClass $schoolClass)
     {
         $search = trim((string) $request->input('q', ''));
@@ -1052,7 +1155,7 @@ class SchoolController extends Controller
         $enrollments = $schoolClass->enrollments()
             ->with('student')
             ->where('status', 'active')
-            ->when($search !== '', fn($query) => $query->whereHas('student', function ($student) use ($search): void {
+            ->when($search !== '', fn ($query) => $query->whereHas('student', function ($student) use ($search): void {
                 $student->where('student_code', 'like', "%{$search}%")
                     ->orWhere('full_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
@@ -1070,6 +1173,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Tạo lớp học mới, đồng thời xử lý xác thực năm học và giáo viên chủ nhiệm.
+     */
     public function storeClass(Request $request, HomeroomAssignmentService $homeroomService)
     {
         $data = $request->validate([
@@ -1102,6 +1208,9 @@ class SchoolController extends Controller
         return to_route('admin.school.classes.index')->with('success', 'Đã tạo lớp học.');
     }
 
+    /**
+     * Mở form chỉnh sửa thông tin lớp học và chủ nhiệm hiện tại.
+     */
     public function editClass(SchoolClass $schoolClass)
     {
         return view('admin.school.classes.form', [
@@ -1110,11 +1219,14 @@ class SchoolController extends Controller
             'grades' => Grade::orderBy('level')->get(),
             'teachers' => Teacher::where(function ($query) use ($schoolClass): void {
                 $query->where('status', 'active')
-                    ->when($schoolClass->homeroom_teacher_id, fn($query) => $query->orWhere('id', $schoolClass->homeroom_teacher_id));
+                    ->when($schoolClass->homeroom_teacher_id, fn ($query) => $query->orWhere('id', $schoolClass->homeroom_teacher_id));
             })->orderBy('full_name')->get(),
         ]);
     }
 
+    /**
+     * Cập nhật lớp học và thay đổi chủ nhiệm nếu có, đồng thời kiểm tra các ràng buộc nghiệp vụ.
+     */
     public function updateClass(Request $request, SchoolClass $schoolClass, HomeroomAssignmentService $homeroomService)
     {
         $data = $request->validate([
@@ -1138,8 +1250,10 @@ class SchoolController extends Controller
             $schoolClass->id,
             $schoolClass->homeroom_teacher_id
         );
-        if ((int) $schoolClass->academic_year_id !== (int) $year->id
-            && ($schoolClass->enrollments()->exists() || $schoolClass->assignments()->exists() || $schoolClass->schedules()->exists())) {
+        if (
+            (int) $schoolClass->academic_year_id !== (int) $year->id
+            && ($schoolClass->enrollments()->exists() || $schoolClass->assignments()->exists() || $schoolClass->schedules()->exists())
+        ) {
             throw ValidationException::withMessages([
                 'academic_year_id' => 'Không thể đổi năm học của lớp đã phát sinh dữ liệu.',
             ]);
@@ -1164,6 +1278,9 @@ class SchoolController extends Controller
         return to_route('admin.school.classes.index')->with('success', 'Đã cập nhật lớp học.');
     }
 
+    /**
+     * Xóa lớp học nếu chưa có dữ liệu lịch sử học vụ, phân công hoặc điểm danh.
+     */
     public function destroyClass(SchoolClass $schoolClass)
     {
         $hasHistory = $schoolClass->enrollments()->exists()
@@ -1182,6 +1299,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa lớp học.');
     }
 
+    /**
+     * Hiển thị danh sách phân công giảng dạy theo năm học, học kỳ, lớp, môn và giáo viên.
+     */
     public function assignments(Request $request)
     {
         $currentYear = $this->currentYear();
@@ -1192,18 +1312,18 @@ class SchoolController extends Controller
         $subjectId = $request->filled('subject_id') ? (int) $request->input('subject_id') : null;
         $teacherId = $request->filled('teacher_id') ? (int) $request->input('teacher_id') : null;
         $assignments = TeachingAssignment::with(['academicYear', 'semester', 'class', 'subject', 'teacher'])
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('class', fn($class) => $class->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                    ->orWhereHas('subject', fn($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                    ->orWhereHas('teacher', fn($teacher) => $teacher->where('full_name', 'like', "%{$search}%"));
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+                $query->whereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('teacher', fn ($teacher) => $teacher->where('full_name', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-            ->when($semesterId, fn($query) => $query->where('semester_id', $semesterId))
-            ->when($classId, fn($query) => $query->where('class_id', $classId))
-            ->when($subjectId, fn($query) => $query->where('subject_id', $subjectId))
-            ->when($teacherId, fn($query) => $query->where('teacher_id', $teacherId))
+            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->when($classId, fn ($query) => $query->where('class_id', $classId))
+            ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
+            ->when($teacherId, fn ($query) => $query->where('teacher_id', $teacherId))
             ->latest()
-            ->paginate(20)
+            ->paginate(10)
             ->withQueryString();
 
         return view('admin.school.assignments.index', [
@@ -1219,6 +1339,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form chỉnh sửa phân công giảng dạy hiện tại.
+     */
     public function editAssignment(TeachingAssignment $assignment)
     {
         return view('admin.school.assignments.form', [
@@ -1233,6 +1356,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Tạo mới phân công giảng dạy và kiểm tra điều kiện theo môn, giáo viên và năm học.
+     */
     public function storeAssignment(StoreTeachingAssignmentRequest $request, TeachingAssignmentService $assignmentService)
     {
         $assignmentService->create($request->validated());
@@ -1240,6 +1366,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã tạo phân công giảng dạy.');
     }
 
+    /**
+     * Cập nhật phân công giảng dạy với validation chuyên môn và lịch dạy.
+     */
     public function updateAssignment(UpdateTeachingAssignmentRequest $request, TeachingAssignment $assignment, TeachingAssignmentService $assignmentService)
     {
         $assignmentService->update($assignment, $request->validated());
@@ -1247,6 +1376,9 @@ class SchoolController extends Controller
         return to_route('admin.school.assignments.index')->with('success', 'Đã cập nhật phân công giảng dạy.');
     }
 
+    /**
+     * Hiển thị chi tiết phân công của giáo viên trong một môn học, bao gồm lớp và năm học liên quan.
+     */
     public function subjectTeacherDetail(Subject $subject, Teacher $teacher)
     {
         $assignments = $subject->assignments()
@@ -1280,6 +1412,9 @@ class SchoolController extends Controller
         ));
     }
 
+    /**
+     * Xóa hoặc đóng phân công giảng dạy tùy theo liệu đã phát sinh dữ liệu lịch sử hay chưa.
+     */
     public function destroyAssignment(TeachingAssignment $assignment, TeachingAssignmentService $assignmentService)
     {
         $deleted = $assignmentService->deleteOrDeactivate($assignment);
@@ -1355,18 +1490,21 @@ class SchoolController extends Controller
     //     ]);
     // }
 
+    /**
+     * Hiển thị bảng điểm theo bộ lọc tìm kiếm, năm học, học kỳ, lớp, môn và loại điểm.
+     */
     public function scores(Request $request)
     {
         $filters = [
-            'search'      => trim($request->input('q', '')),
-            'year_id'     => $request->integer('academic_year_id'),
+            'search' => trim($request->input('q', '')),
+            'year_id' => $request->integer('academic_year_id'),
             'semester_id' => $request->integer('semester_id'),
-            'class_id'    => $request->integer('class_id'),
-            'grade_id'    => $request->integer('grade_id'),
-            'subject_id'  => $request->integer('subject_id'),
-            'score_type'  => trim($request->input('score_type', '')),
-            'date_from'   => $request->date('date_from'),
-            'date_to'     => $request->date('date_to'),
+            'class_id' => $request->integer('class_id'),
+            'grade_id' => $request->integer('grade_id'),
+            'subject_id' => $request->integer('subject_id'),
+            'score_type' => trim($request->input('score_type', '')),
+            'date_from' => $request->date('date_from'),
+            'date_to' => $request->date('date_to'),
         ];
 
         $scoreRows = Score::with([
@@ -1380,51 +1518,47 @@ class SchoolController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->whereHas(
                         'student',
-                        fn($q) =>
-                        $q->where('full_name', 'like', "%{$search}%")
+                        fn ($q) => $q->where('full_name', 'like', "%{$search}%")
                             ->orWhere('student_code', 'like', "%{$search}%")
                     )
                         ->orWhereHas(
                             'class',
-                            fn($q) =>
-                            $q->where('name', 'like', "%{$search}%")
+                            fn ($q) => $q->where('name', 'like', "%{$search}%")
                         )
                         ->orWhereHas(
                             'subject',
-                            fn($q) =>
-                            $q->where('name', 'like', "%{$search}%")
+                            fn ($q) => $q->where('name', 'like', "%{$search}%")
                                 ->orWhere('code', 'like', "%{$search}%")
                         );
                 });
             })
-            ->when($filters['year_id'], fn($q, $id) => $q->where('academic_year_id', $id))
-            ->when($filters['semester_id'], fn($q, $id) => $q->where('semester_id', $id))
-            ->when($filters['class_id'], fn($q, $id) => $q->where('class_id', $id))
+            ->when($filters['year_id'], fn ($q, $id) => $q->where('academic_year_id', $id))
+            ->when($filters['semester_id'], fn ($q, $id) => $q->where('semester_id', $id))
+            ->when($filters['class_id'], fn ($q, $id) => $q->where('class_id', $id))
             ->when(
                 $filters['grade_id'],
-                fn($q, $id) =>
-                $q->whereHas('class', fn($q) => $q->where('grade_id', $filters['grade_id']))
+                fn ($q, $id) => $q->whereHas('class', fn ($q) => $q->where('grade_id', $filters['grade_id']))
             )
-            ->when($filters['subject_id'], fn($q, $id) => $q->where('subject_id', $id))
-            ->when($filters['score_type'], fn($q, $type) => $q->where('score_type', $type))
-            ->when($filters['date_from'], fn($q, $date) => $q->whereDate('assessed_on', '>=', $date))
-            ->when($filters['date_to'], fn($q, $date) => $q->whereDate('assessed_on', '<=', $date))
+            ->when($filters['subject_id'], fn ($q, $id) => $q->where('subject_id', $id))
+            ->when($filters['score_type'], fn ($q, $type) => $q->where('score_type', $type))
+            ->when($filters['date_from'], fn ($q, $date) => $q->whereDate('assessed_on', '>=', $date))
+            ->when($filters['date_to'], fn ($q, $date) => $q->whereDate('assessed_on', '<=', $date))
             ->latest('assessed_on')
             ->get();
 
         $scoreGroups = $scoreRows
-            ->groupBy(fn($score) => "{$score->academic_year_id}|{$score->semester_id}|{$score->student_id}|{$score->class_id}|{$score->subject_id}")
+            ->groupBy(fn ($score) => "{$score->academic_year_id}|{$score->semester_id}|{$score->student_id}|{$score->class_id}|{$score->subject_id}")
             ->map(function ($group) {
                 $first = $group->first();
 
                 return (object) [
-                    'scores'          => $group->sortByDesc('assessed_on')->values(),
-                    'student'         => $first->student,
-                    'class'           => $first->class,
-                    'subject'         => $first->subject,
-                    'semester'        => $first->semester,
-                    'academicYear'    => $first->academicYear,
-                    'latestTimestamp' => $group->max(fn($score) => $score->assessed_on?->timestamp ?? 0),
+                    'scores' => $group->sortByDesc('assessed_on')->values(),
+                    'student' => $first->student,
+                    'class' => $first->class,
+                    'subject' => $first->subject,
+                    'semester' => $first->semester,
+                    'academicYear' => $first->academicYear,
+                    'latestTimestamp' => $group->max(fn ($score) => $score->assessed_on?->timestamp ?? 0),
                 ];
             })
             ->sortByDesc('latestTimestamp')
@@ -1439,32 +1573,35 @@ class SchoolController extends Controller
             $perPage,
             $page,
             [
-                'path'  => $request->url(),
+                'path' => $request->url(),
                 'query' => $request->query(),
             ]
         );
 
         return view('admin.school.scores.index', [
-            'scores'     => $scores,
-            'years'      => AcademicYear::orderByDesc('starts_on')->get(),
-            'semesters'  => Semester::with('academicYear')->orderByDesc('id')->get(),
-            'classes'    => SchoolClass::with('academicYear')
+            'scores' => $scores,
+            'years' => AcademicYear::orderByDesc('starts_on')->get(),
+            'semesters' => Semester::with('academicYear')->orderByDesc('id')->get(),
+            'classes' => SchoolClass::with('academicYear')
                 ->where('status', 'active')
                 ->orderByDesc('academic_year_id')
                 ->orderBy('name')
                 ->get(),
-            'grades'     => Grade::orderBy('level')->get(),
-            'subjects'   => Subject::where('is_active', true)->orderBy('name')->get(),
+            'grades' => Grade::orderBy('level')->get(),
+            'subjects' => Subject::where('is_active', true)->orderBy('name')->get(),
             'scoreTypes' => [
-                'oral'         => 'Miệng',
+                'oral' => 'Miệng',
                 'fifteen_minute' => '15 phút',
-                'one_period'   => '1 tiết',
-                'midterm'      => 'Giữa kỳ',
-                'final'        => 'Cuối kỳ',
+                'one_period' => '1 tiết',
+                'midterm' => 'Giữa kỳ',
+                'final' => 'Cuối kỳ',
             ],
         ]);
     }
 
+    /**
+     * Hiển thị dữ liệu điểm danh theo ngày, lớp, môn và trạng thái hiện diện của học sinh.
+     */
     public function attendance(Request $request)
     {
         $date = $request->date('date');
@@ -1479,16 +1616,16 @@ class SchoolController extends Controller
         $records = AttendanceRecord::with(['student', 'class', 'subject'])
             ->whereDate('attended_on', '>=', $dateFrom)
             ->whereDate('attended_on', '<=', $dateTo)
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('student', fn($student) => $student->where('full_name', 'like', "%{$search}%")->orWhere('student_code', 'like', "%{$search}%"))
-                    ->orWhereHas('class', fn($class) => $class->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('subject', fn($subject) => $subject->where('name', 'like', "%{$search}%"));
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+                $query->whereHas('student', fn ($student) => $student->where('full_name', 'like', "%{$search}%")->orWhere('student_code', 'like', "%{$search}%"))
+                    ->orWhereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-            ->when($classId, fn($query) => $query->where('class_id', $classId))
-            ->when($gradeId, fn($query) => $query->whereHas('class', fn($class) => $class->where('grade_id', $gradeId)))
-            ->when($subjectId, fn($query) => $query->where('subject_id', $subjectId))
-            ->when($status !== '', fn($query) => $query->where('status', $status))
+            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+            ->when($classId, fn ($query) => $query->where('class_id', $classId))
+            ->when($gradeId, fn ($query) => $query->whereHas('class', fn ($class) => $class->where('grade_id', $gradeId)))
+            ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->latest()->paginate(30)->withQueryString();
 
         return view('admin.school.attendance.index', [
@@ -1504,6 +1641,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Hiển thị thời khóa biểu theo năm học, học kỳ, tuần và lớp chọn lọc.
+     */
     public function schedules(Request $request)
     {
         $currentYear = $this->currentYear();
@@ -1528,8 +1668,8 @@ class SchoolController extends Controller
 
         $classQuery = SchoolClass::with('grade')
             ->where('status', 'active')
-            ->when($selectedYearId, fn($query) => $query->where('academic_year_id', $selectedYearId))
-            ->when($selectedClassId, fn($query) => $query->whereKey($selectedClassId))
+            ->when($selectedYearId, fn ($query) => $query->where('academic_year_id', $selectedYearId))
+            ->when($selectedClassId, fn ($query) => $query->whereKey($selectedClassId))
             ->orderBy('name');
         // The schedule view renders one grid per class and needs collection
         // operations such as groupBy/whereIn; keep its options as a collection.
@@ -1539,14 +1679,14 @@ class SchoolController extends Controller
         $teachers = Teacher::with('subjects')->where('status', 'active')->orderBy('full_name')->get();
 
         $schedules = Schedule::with(['class.grade', 'subject', 'teacher', 'semester'])
-            ->when($selectedYearId, fn($query) => $query->where('academic_year_id', $selectedYearId))
-            ->when($selectedSemesterId, fn($query) => $query->where('semester_id', $selectedSemesterId))
+            ->when($selectedYearId, fn ($query) => $query->where('academic_year_id', $selectedYearId))
+            ->when($selectedSemesterId, fn ($query) => $query->where('semester_id', $selectedSemesterId))
             ->whereDate('week_start', $selectedWeekStart)
-            ->when($selectedClassId, fn($query) => $query->where('class_id', $selectedClassId))
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('class', fn($class) => $class->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                    ->orWhereHas('subject', fn($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
-                    ->orWhereHas('teacher', fn($teacher) => $teacher->where('full_name', 'like', "%{$search}%"))
+            ->when($selectedClassId, fn ($query) => $query->where('class_id', $selectedClassId))
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+                $query->whereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))
+                    ->orWhereHas('teacher', fn ($teacher) => $teacher->where('full_name', 'like', "%{$search}%"))
                     ->orWhere('room', 'like', "%{$search}%");
             }))
             ->orderBy('class_id')
@@ -1570,6 +1710,9 @@ class SchoolController extends Controller
         ));
     }
 
+    /**
+     * Thêm tiết học mới vào thời khóa biểu với các kiểm tra xung đột lớp và giáo viên.
+     */
     public function storeSchedule(Request $request)
     {
         $data = $this->scheduleData($request);
@@ -1583,6 +1726,9 @@ class SchoolController extends Controller
         ])->with('success', 'Đã thêm tiết học vào thời khóa biểu.');
     }
 
+    /**
+     * Cập nhật tiết học hiện có và giữ nguyên cấu trúc thời khóa biểu hợp lệ.
+     */
     public function updateSchedule(Request $request, Schedule $schedule)
     {
         $data = $this->scheduleData($request, $schedule);
@@ -1596,6 +1742,9 @@ class SchoolController extends Controller
         ])->with('success', 'Đã cập nhật tiết học.');
     }
 
+    /**
+     * Xóa một tiết học khỏi thời khóa biểu.
+     */
     public function destroySchedule(Schedule $schedule)
     {
         $schedule->delete();
@@ -1603,6 +1752,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa tiết học khỏi thời khóa biểu.');
     }
 
+    /**
+     * Hiển thị danh sách lịch thi theo năm học, học kỳ, lớp, môn và thời gian.
+     */
     public function exams(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
@@ -1614,20 +1766,20 @@ class SchoolController extends Controller
         $dateFrom = $request->date('date_from');
         $dateTo = $request->date('date_to');
         $exams = Exam::with(['subject', 'class', 'semester', 'invigilations.teacher'])
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('exam_type', 'like', "%{$search}%")
                     ->orWhere('room', 'like', "%{$search}%")
-                    ->orWhereHas('subject', fn($subject) => $subject->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('class', fn($class) => $class->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('subject', fn ($subject) => $subject->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('class', fn ($class) => $class->where('name', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-            ->when($semesterId, fn($query) => $query->where('semester_id', $semesterId))
-            ->when($classId, fn($query) => $query->where('class_id', $classId))
-            ->when($subjectId, fn($query) => $query->where('subject_id', $subjectId))
-            ->when($examType !== '', fn($query) => $query->where('exam_type', $examType))
-            ->when($dateFrom, fn($query) => $query->whereDate('exam_date', '>=', $dateFrom))
-            ->when($dateTo, fn($query) => $query->whereDate('exam_date', '<=', $dateTo))
+            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->when($classId, fn ($query) => $query->where('class_id', $classId))
+            ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId))
+            ->when($examType !== '', fn ($query) => $query->where('exam_type', $examType))
+            ->when($dateFrom, fn ($query) => $query->whereDate('exam_date', '>=', $dateFrom))
+            ->when($dateTo, fn ($query) => $query->whereDate('exam_date', '<=', $dateTo))
             ->orderBy('exam_date')->paginate(20)->withQueryString();
 
         return view('admin.school.exams.index', [
@@ -1640,16 +1792,25 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo lịch thi mới.
+     */
     public function createExam()
     {
         return view('admin.school.exams.form', $this->examFormData());
     }
 
+    /**
+     * Mở form chỉnh sửa lịch thi đã tồn tại.
+     */
     public function editExam(Exam $exam)
     {
         return view('admin.school.exams.form', $this->examFormData($exam));
     }
 
+    /**
+     * Lưu lịch thi mới sau khi validate thông tin ngày, giờ, môn và lớp.
+     */
     public function storeExam(Request $request)
     {
         Exam::create($this->examData($request));
@@ -1657,6 +1818,9 @@ class SchoolController extends Controller
         return to_route('admin.school.exams.index')->with('success', 'Đã thêm lịch thi.');
     }
 
+    /**
+     * Cập nhật lịch thi và giữ nguyên các ràng buộc thời gian, lớp và môn học.
+     */
     public function updateExam(Request $request, Exam $exam)
     {
         $exam->update($this->examData($request));
@@ -1664,6 +1828,9 @@ class SchoolController extends Controller
         return to_route('admin.school.exams.index')->with('success', 'Đã cập nhật lịch thi.');
     }
 
+    /**
+     * Xóa lịch thi khỏi hệ thống.
+     */
     public function destroyExam(Exam $exam)
     {
         $exam->delete();
@@ -1671,6 +1838,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa lịch thi.');
     }
 
+    /**
+     * Hiển thị danh sách phân công coi thi theo năm học, giáo viên và khoảng thời gian.
+     */
     public function examInvigilations(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
@@ -1680,18 +1850,18 @@ class SchoolController extends Controller
         $dateTo = $request->date('date_to');
 
         $invigilations = ExamInvigilation::with(['exam.academicYear', 'exam.semester', 'exam.subject', 'exam.class', 'teacher'])
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
-                $query->whereHas('teacher', fn($teacher) => $teacher
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
+                $query->whereHas('teacher', fn ($teacher) => $teacher
                     ->where('full_name', 'like', "%{$search}%")
                     ->orWhere('teacher_code', 'like', "%{$search}%"))
-                    ->orWhereHas('exam', fn($exam) => $exam
+                    ->orWhereHas('exam', fn ($exam) => $exam
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('room', 'like', "%{$search}%"));
             }))
-            ->when($yearId, fn($query) => $query->whereHas('exam', fn($exam) => $exam->where('academic_year_id', $yearId)))
-            ->when($teacherId, fn($query) => $query->where('teacher_id', $teacherId))
-            ->when($dateFrom, fn($query) => $query->whereHas('exam', fn($exam) => $exam->whereDate('exam_date', '>=', $dateFrom)))
-            ->when($dateTo, fn($query) => $query->whereHas('exam', fn($exam) => $exam->whereDate('exam_date', '<=', $dateTo)))
+            ->when($yearId, fn ($query) => $query->whereHas('exam', fn ($exam) => $exam->where('academic_year_id', $yearId)))
+            ->when($teacherId, fn ($query) => $query->where('teacher_id', $teacherId))
+            ->when($dateFrom, fn ($query) => $query->whereHas('exam', fn ($exam) => $exam->whereDate('exam_date', '>=', $dateFrom)))
+            ->when($dateTo, fn ($query) => $query->whereHas('exam', fn ($exam) => $exam->whereDate('exam_date', '<=', $dateTo)))
             ->join('exams', 'exams.id', '=', 'exam_invigilations.exam_id')
             ->select('exam_invigilations.*')
             ->orderBy('exams.exam_date')
@@ -1707,6 +1877,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo phân công coi thi, có thể preselect lịch thi từ query string.
+     */
     public function createExamInvigilation(Request $request)
     {
         return view('admin.school.exam-invigilations.form', $this->examInvigilationFormData(
@@ -1715,6 +1888,9 @@ class SchoolController extends Controller
         ));
     }
 
+    /**
+     * Lưu phân công coi thi và gửi thông báo cho giáo viên được phân công.
+     */
     public function storeExamInvigilation(Request $request)
     {
         $invigilation = ExamInvigilation::create($this->examInvigilationData($request));
@@ -1723,11 +1899,17 @@ class SchoolController extends Controller
         return to_route('admin.school.exam-invigilations.index')->with('success', 'Đã phân công giáo viên coi thi.');
     }
 
+    /**
+     * Mở form chỉnh sửa phân công coi thi.
+     */
     public function editExamInvigilation(ExamInvigilation $examInvigilation)
     {
         return view('admin.school.exam-invigilations.form', $this->examInvigilationFormData($examInvigilation));
     }
 
+    /**
+     * Cập nhật phân công coi thi và kiểm tra trùng lịch, vai trò và thời gian.
+     */
     public function updateExamInvigilation(Request $request, ExamInvigilation $examInvigilation)
     {
         $examInvigilation->update($this->examInvigilationData($request, $examInvigilation));
@@ -1736,6 +1918,9 @@ class SchoolController extends Controller
         return to_route('admin.school.exam-invigilations.index')->with('success', 'Đã cập nhật phân công coi thi.');
     }
 
+    /**
+     * Xóa phân công coi thi khỏi lịch thi.
+     */
     public function destroyExamInvigilation(ExamInvigilation $examInvigilation)
     {
         $examInvigilation->delete();
@@ -1743,27 +1928,33 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa phân công coi thi.');
     }
 
+    /**
+     * Gửi thông báo cho giáo viên khi được phân công hoặc cập nhật lịch coi thi.
+     */
     private function notifyExamInvigilator(ExamInvigilation $invigilation, string $action): void
     {
         $invigilation->load(['exam.subject', 'exam.class', 'teacher.user']);
         $invigilation->teacher?->user?->notify(new ExamInvigilationAssigned($invigilation, $action));
     }
 
+    /**
+     * Hiển thị danh sách thông báo và lọc theo đối tượng, loại, trạng thái xuất bản.
+     */
     public function announcements(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
         $audience = trim((string) $request->input('audience', ''));
         $type = trim((string) $request->input('type', ''));
         $published = $request->input('published', '');
-        $announcements = Announcement::with('class')->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+        $announcements = Announcement::with('class')->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
             $query->where('title', 'like', "%{$search}%")
                 ->orWhere('content', 'like', "%{$search}%")
                 ->orWhere('type', 'like', "%{$search}%")
                 ->orWhere('audience', 'like', "%{$search}%");
         }))
-            ->when($audience !== '', fn($query) => $query->where('audience', $audience))
-            ->when($type !== '', fn($query) => $query->where('type', $type))
-            ->when($published !== '', fn($query) => $query->where('is_published', $published === 'published'))
+            ->when($audience !== '', fn ($query) => $query->where('audience', $audience))
+            ->when($type !== '', fn ($query) => $query->where('type', $type))
+            ->when($published !== '', fn ($query) => $query->where('is_published', $published === 'published'))
             ->latest()->paginate(20)->withQueryString();
 
         return view('admin.school.announcements.index', [
@@ -1773,16 +1964,25 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo thông báo mới.
+     */
     public function createAnnouncement()
     {
         return view('admin.school.announcements.form', $this->announcementFormData());
     }
 
+    /**
+     * Mở form chỉnh sửa thông báo hiện có.
+     */
     public function editAnnouncement(Announcement $announcement)
     {
         return view('admin.school.announcements.form', $this->announcementFormData($announcement));
     }
 
+    /**
+     * Lưu thông báo mới với dữ liệu đối tượng và trạng thái xuất bản.
+     */
     public function storeAnnouncement(Request $request)
     {
         Announcement::create($this->announcementData($request) + ['author_id' => auth()->id()]);
@@ -1790,6 +1990,9 @@ class SchoolController extends Controller
         return to_route('admin.school.announcements.index')->with('success', 'Đã tạo thông báo.');
     }
 
+    /**
+     * Cập nhật thông báo và giữ nguyên quyền xuất bản và đối tượng nhận.
+     */
     public function updateAnnouncement(Request $request, Announcement $announcement)
     {
         $announcement->update($this->announcementData($request));
@@ -1797,6 +2000,9 @@ class SchoolController extends Controller
         return to_route('admin.school.announcements.index')->with('success', 'Đã cập nhật thông báo.');
     }
 
+    /**
+     * Xóa thông báo khỏi hệ thống.
+     */
     public function destroyAnnouncement(Announcement $announcement)
     {
         $announcement->delete();
@@ -1804,6 +2010,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa thông báo.');
     }
 
+    /**
+     * Hiển thị danh sách khoản thu theo năm học, học kỳ, lớp và trạng thái kích hoạt.
+     */
     public function fees(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
@@ -1813,14 +2022,14 @@ class SchoolController extends Controller
         $active = $request->input('active', '');
         $fees = FeeNotice::with(['payments'])
             ->withCount('payments')
-            ->when($search !== '', fn($query) => $query->where(function ($query) use ($search): void {
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search): void {
                 $query->where('title', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
             }))
-            ->when($yearId, fn($query) => $query->where('academic_year_id', $yearId))
-            ->when($semesterId, fn($query) => $query->where('semester_id', $semesterId))
-            ->when($classId, fn($query) => $query->where('class_id', $classId))
-            ->when($active !== '', fn($query) => $query->where('is_active', $active === 'active'))
+            ->when($yearId, fn ($query) => $query->where('academic_year_id', $yearId))
+            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->when($classId, fn ($query) => $query->where('class_id', $classId))
+            ->when($active !== '', fn ($query) => $query->where('is_active', $active === 'active'))
             ->latest()->paginate(20)->withQueryString();
 
         return view('admin.school.fees.index', [
@@ -1831,6 +2040,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Mở form tạo khoản thu học phí mới, tránh mở lại chế độ legacy nếu hệ thống mới đã có fee assessments.
+     */
     public function createFee()
     {
         if (Schema::hasTable('fee_assessments')) {
@@ -1841,6 +2053,9 @@ class SchoolController extends Controller
         return view('admin.school.fees.form', $this->feeFormData());
     }
 
+    /**
+     * Mở form chỉnh sửa khoản thu học phí, chặn sửa notice legacy nếu đang vận hành mô hình mới.
+     */
     public function editFee(FeeNotice $fee)
     {
         if (Schema::hasTable('fee_assessments') && $fee->isLegacy()) {
@@ -1851,6 +2066,9 @@ class SchoolController extends Controller
         return view('admin.school.fees.form', $this->feeFormData($fee));
     }
 
+    /**
+     * Lưu khoản thu học phí mới trên hệ thống legacy nếu chưa có mô hình fee assessment mới.
+     */
     public function storeFee(Request $request)
     {
         if (Schema::hasTable('fee_assessments')) {
@@ -1864,6 +2082,9 @@ class SchoolController extends Controller
         return to_route('admin.school.fees.index')->with('success', 'Đã tạo khoản thu học phí.');
     }
 
+    /**
+     * Cập nhật khoản thu học phí, đồng thời chặn thao tác trên dữ liệu legacy không được phép sửa.
+     */
     public function updateFee(Request $request, FeeNotice $fee)
     {
         if ($fee->isLegacy()) {
@@ -1875,6 +2096,9 @@ class SchoolController extends Controller
         return to_route('admin.school.fees.index')->with('success', 'Đã cập nhật khoản thu học phí.');
     }
 
+    /**
+     * Xóa khoản thu học phí khi chưa có dữ liệu tài chính hoặc lịch sử thanh toán liên quan.
+     */
     public function destroyFee(FeeNotice $fee)
     {
         if ($fee->isLegacy() || $fee->assessments()->exists() || $fee->payments()->exists()) {
@@ -1888,6 +2112,9 @@ class SchoolController extends Controller
         return back()->with('success', 'Đã xóa khoản thu học phí.');
     }
 
+    /**
+     * Chuẩn bị dữ liệu cho form lịch thi, bao gồm các danh sách hỗ trợ như năm học, học kỳ, môn và lớp.
+     */
     private function examFormData(?Exam $exam = null): array
     {
         return [
@@ -1899,6 +2126,9 @@ class SchoolController extends Controller
         ];
     }
 
+    /**
+     * Validate dữ liệu đầu vào khi tạo hoặc cập nhật lịch thi.
+     */
     private function examData(Request $request): array
     {
         return $request->validate([
@@ -1916,6 +2146,9 @@ class SchoolController extends Controller
         ]);
     }
 
+    /**
+     * Chuẩn bị dữ liệu form phân công coi thi, bao gồm đề thi được chọn và danh sách giáo viên.
+     */
     private function examInvigilationFormData(?ExamInvigilation $examInvigilation = null, ?int $selectedExamId = null): array
     {
         return [
@@ -1927,12 +2160,15 @@ class SchoolController extends Controller
                 ->get(),
             'teachers' => Teacher::where(function ($query) use ($examInvigilation): void {
                 $query->where('status', 'active')
-                    ->when($examInvigilation, fn($query) => $query->orWhere('id', $examInvigilation->teacher_id));
+                    ->when($examInvigilation, fn ($query) => $query->orWhere('id', $examInvigilation->teacher_id));
             })->orderBy('full_name')->get(),
             'roles' => $this->invigilationRoles(),
         ];
     }
 
+    /**
+     * Validate phân công coi thi và kiểm tra trùng lịch hoặc vai trò không hợp lệ.
+     */
     private function examInvigilationData(Request $request, ?ExamInvigilation $examInvigilation = null): array
     {
         $data = $request->validate([
@@ -1952,7 +2188,7 @@ class SchoolController extends Controller
 
         $duplicate = ExamInvigilation::where('exam_id', $data['exam_id'])
             ->where('teacher_id', $data['teacher_id'])
-            ->when($examInvigilation, fn($query) => $query->whereKeyNot($examInvigilation->id))
+            ->when($examInvigilation, fn ($query) => $query->whereKeyNot($examInvigilation->id))
             ->exists();
         if ($duplicate) {
             throw ValidationException::withMessages(['teacher_id' => 'Giáo viên đã được phân công trong kỳ thi này.']);
@@ -1960,7 +2196,7 @@ class SchoolController extends Controller
 
         $exam = Exam::findOrFail($data['exam_id']);
         $conflict = ExamInvigilation::where('teacher_id', $data['teacher_id'])
-            ->when($examInvigilation, fn($query) => $query->whereKeyNot($examInvigilation->id))
+            ->when($examInvigilation, fn ($query) => $query->whereKeyNot($examInvigilation->id))
             ->whereHas('exam', function ($query) use ($exam): void {
                 $query->whereKeyNot($exam->id)
                     ->whereDate('exam_date', $exam->exam_date);
@@ -1984,11 +2220,17 @@ class SchoolController extends Controller
         return $data;
     }
 
+    /**
+     * Trả về danh sách vai trò coi thi dùng trong hệ thống.
+     */
     private function invigilationRoles(): array
     {
         return ['chief' => 'Cán bộ coi thi 1', 'invigilator' => 'Cán bộ coi thi 2', 'reserve' => 'Giáo viên dự phòng'];
     }
 
+    /**
+     * Validate dữ liệu thông báo trước khi lưu hoặc cập nhật.
+     */
     private function announcementData(Request $request): array
     {
         return $request->validate([
@@ -2003,6 +2245,9 @@ class SchoolController extends Controller
         ]) + ['is_published' => $request->boolean('is_published')];
     }
 
+    /**
+     * Chuẩn bị dữ liệu form thông báo với lựa chọn lớp nhận thông báo.
+     */
     private function announcementFormData(?Announcement $announcement = null): array
     {
         return [
@@ -2015,6 +2260,9 @@ class SchoolController extends Controller
         ];
     }
 
+    /**
+     * Chuẩn bị dữ liệu form khoản thu học phí và các danh mục phụ trợ.
+     */
     private function feeFormData(?FeeNotice $fee = null): array
     {
         return [
@@ -2025,6 +2273,9 @@ class SchoolController extends Controller
         ];
     }
 
+    /**
+     * Validate dữ liệu khoản thu học phí trước khi lưu vào hệ thống.
+     */
     private function feeData(Request $request): array
     {
         return $request->validate([
@@ -2039,6 +2290,9 @@ class SchoolController extends Controller
         ]) + ['is_active' => $request->boolean('is_active')];
     }
 
+    /**
+     * Validate dữ liệu tiết học và kiểm tra xung đột lớp, môn, giáo viên và học kỳ.
+     */
     private function scheduleData(Request $request, ?Schedule $schedule = null): array
     {
         $data = $request->validate([
@@ -2080,7 +2334,7 @@ class SchoolController extends Controller
             ->whereDate('week_start', $data['week_start'])
             ->where('weekday', $data['weekday'])
             ->where('period', $data['period'])
-            ->when($schedule, fn($query) => $query->whereKeyNot($schedule->id))
+            ->when($schedule, fn ($query) => $query->whereKeyNot($schedule->id))
             ->exists();
         if ($classConflict) {
             throw ValidationException::withMessages(['period' => 'Lớp đã có môn học ở thứ và tiết này.']);
@@ -2092,7 +2346,7 @@ class SchoolController extends Controller
                 ->whereDate('week_start', $data['week_start'])
                 ->where('weekday', $data['weekday'])
                 ->where('period', $data['period'])
-                ->when($schedule, fn($query) => $query->whereKeyNot($schedule->id))
+                ->when($schedule, fn ($query) => $query->whereKeyNot($schedule->id))
                 ->exists();
             if ($teacherConflict) {
                 throw ValidationException::withMessages(['teacher_id' => 'Giáo viên đã có lịch dạy ở lớp khác trong tiết này.']);
@@ -2102,12 +2356,18 @@ class SchoolController extends Controller
         return $data;
     }
 
+    /**
+     * Trả về năm học hiện tại hoặc gần nhất nếu chưa có năm học đang hoạt động.
+     */
     private function currentYear(): ?AcademicYear
     {
         return AcademicYear::where('is_current', true)->with('semesters')->first()
             ?? AcademicYear::latest('starts_on')->with('semesters')->first();
     }
 
+    /**
+     * Kiểm tra giáo viên chủ nhiệm có hợp lệ và chưa được phân công cho lớp khác trong cùng năm học.
+     */
     private function validateHomeroomTeacher(?int $teacherId, int $academicYearId, ?int $classId = null, ?int $currentTeacherId = null): void
     {
         if (! $teacherId) {
@@ -2123,13 +2383,16 @@ class SchoolController extends Controller
 
         $alreadyAssigned = SchoolClass::where('academic_year_id', $academicYearId)
             ->where('homeroom_teacher_id', $teacherId)
-            ->when($classId, fn($query) => $query->whereKeyNot($classId))
+            ->when($classId, fn ($query) => $query->whereKeyNot($classId))
             ->exists();
         if ($alreadyAssigned) {
             throw ValidationException::withMessages(['homeroom_teacher_id' => 'Giáo viên này đã là chủ nhiệm của một lớp khác trong năm học đã chọn.']);
         }
     }
 
+    /**
+     * Tạo hoặc lấy đối tượng năm học theo ID hoặc định dạng tên năm học dạng YYYY-YYYY.
+     */
     private function resolveAcademicYear(?int $yearId, ?string $name): AcademicYear
     {
         if ($yearId) {
@@ -2148,21 +2411,24 @@ class SchoolController extends Controller
         }
 
         $year = AcademicYear::firstOrCreate(
-            ['code' => $start . '-' . $end],
-            ['name' => $start . '-' . $end, 'starts_on' => $start . '-08-15', 'ends_on' => $end . '-05-31', 'is_current' => false]
+            ['code' => $start.'-'.$end],
+            ['name' => $start.'-'.$end, 'starts_on' => $start.'-08-15', 'ends_on' => $end.'-05-31', 'is_current' => false]
         );
         Semester::firstOrCreate(
             ['academic_year_id' => $year->id, 'number' => 1],
-            ['name' => 'Semester 1', 'starts_on' => $start . '-08-15', 'ends_on' => $start . '-12-31', 'is_current' => false]
+            ['name' => 'Semester 1', 'starts_on' => $start.'-08-15', 'ends_on' => $start.'-12-31', 'is_current' => false]
         );
         Semester::firstOrCreate(
             ['academic_year_id' => $year->id, 'number' => 2],
-            ['name' => 'Semester 2', 'starts_on' => $end . '-01-01', 'ends_on' => $end . '-05-31', 'is_current' => false]
+            ['name' => 'Semester 2', 'starts_on' => $end.'-01-01', 'ends_on' => $end.'-05-31', 'is_current' => false]
         );
 
         return $year;
     }
 
+    /**
+     * Validate dữ liệu học sinh và tách thông tin liên quan đến avatar, phụ huynh và đăng ký lớp.
+     */
     private function studentData(Request $request, ?Student $student = null): array
     {
         $emailRules = ['email', 'max:255'];
@@ -2211,6 +2477,9 @@ class SchoolController extends Controller
         return ['student' => $data, 'avatar' => $avatar, 'guardians' => $guardians, ...$enrollment];
     }
 
+    /**
+     * Đồng bộ trạng thái nhập học và lớp đang học của học sinh theo năm học hiện tại.
+     */
     private function syncEnrollment(Student $student, ?int $yearId, ?int $classId): void
     {
         if ($student->status !== 'studying') {
@@ -2247,6 +2516,9 @@ class SchoolController extends Controller
         );
     }
 
+    /**
+     * Validate dữ liệu giáo viên trước khi lưu hoặc cập nhật hồ sơ.
+     */
     private function teacherData(Request $request, ?Teacher $teacher = null): array
     {
         $emailRules = ['email', 'max:255'];
@@ -2273,6 +2545,9 @@ class SchoolController extends Controller
         return $data;
     }
 
+    /**
+     * Lưu ảnh đại diện mới cho giáo viên và xóa ảnh cũ nếu có.
+     */
     private function storeTeacherAvatar(Request $request, Teacher $teacher): void
     {
         if (! $request->hasFile('avatar')) {
@@ -2284,6 +2559,9 @@ class SchoolController extends Controller
         $teacher->update(['avatar_path' => $request->file('avatar')->store('avatars/teachers', 'public')]);
     }
 
+    /**
+     * Đồng bộ môn giảng dạy và chủ nhiệm của giáo viên theo năm học đã chọn.
+     */
     private function syncTeacherProfile(Request $request, Teacher $teacher): void
     {
         $data = $request->validate([
@@ -2298,13 +2576,13 @@ class SchoolController extends Controller
         if (! $yearId) {
             throw ValidationException::withMessages(['academic_year_id' => 'Hệ thống chưa có năm học để lưu môn giảng dạy.']);
         }
-        $subjectIds = collect($data['subjects'] ?? [])->map(fn($id) => (int) $id)->values();
-        $homeroomClassIds = collect($data['homeroom_class_ids'] ?? [])->map(fn($id) => (int) $id)->unique()->values();
+        $subjectIds = collect($data['subjects'] ?? [])->map(fn ($id) => (int) $id)->values();
+        $homeroomClassIds = collect($data['homeroom_class_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
 
         $existingHomeroomIds = $teacher->homeroomClasses()
             ->where('academic_year_id', $yearId)
             ->pluck('id')
-            ->map(fn($id) => (int) $id);
+            ->map(fn ($id) => (int) $id);
         $hasNewHomeroomAssignment = $homeroomClassIds->diff($existingHomeroomIds)->isNotEmpty();
         if ($teacher->status !== 'active' && $request->boolean('is_homeroom_teacher') && $hasNewHomeroomAssignment) {
             throw ValidationException::withMessages(['status' => 'Giáo viên tạm nghỉ hoặc ngừng công tác không thể nhận phân công chủ nhiệm.']);
@@ -2330,7 +2608,7 @@ class SchoolController extends Controller
         if ($subjectIds->isNotEmpty()) {
             $now = now();
             DB::table('teacher_subject')->insert(
-                $subjectIds->map(fn(int $subjectId) => [
+                $subjectIds->map(fn (int $subjectId) => [
                     'teacher_id' => $teacher->id,
                     'subject_id' => $subjectId,
                     'academic_year_id' => $yearId,
@@ -2352,6 +2630,9 @@ class SchoolController extends Controller
         }
     }
 
+    /**
+     * Tắt các nhiệm vụ đang hoạt động của giáo viên khi ngừng công tác hoặc xóa hồ sơ.
+     */
     private function deactivateTeacherResponsibilities(Teacher $teacher): void
     {
         $teacher->assignments()->where('status', 'active')->update(['status' => 'inactive']);
@@ -2364,14 +2645,24 @@ class SchoolController extends Controller
             ->delete();
     }
 
+    /**
+     * Đồng bộ danh sách phụ huynh cho học sinh, bao gồm thông tin liên hệ và mối quan hệ chính.
+     */
     private function syncGuardians(Student $student, array $rows): void
     {
         $relationships = ['father', 'mother'];
         $existing = $student->guardians()->get()->keyBy('pivot.relationship');
         $primaryRelationship = filled(data_get($rows, 'father.full_name')) ? 'father' : 'mother';
         $fields = [
-            'full_name', 'date_of_birth', 'phone', 'email', 'occupation',
-            'religion', 'workplace', 'address', 'notes',
+            'full_name',
+            'date_of_birth',
+            'phone',
+            'email',
+            'occupation',
+            'religion',
+            'workplace',
+            'address',
+            'notes',
         ];
 
         foreach ($relationships as $relationship) {
@@ -2389,6 +2680,7 @@ class SchoolController extends Controller
                         $guardian->delete();
                     }
                 }
+
                 continue;
             }
 
@@ -2398,7 +2690,7 @@ class SchoolController extends Controller
                 ]);
             }
 
-            $guardian ??= new Guardian();
+            $guardian ??= new Guardian;
             $guardian->fill($payload)->save();
             $student->guardians()->syncWithoutDetaching([
                 $guardian->id => [
@@ -2413,6 +2705,9 @@ class SchoolController extends Controller
         }
     }
 
+    /**
+     * Tạo tài khoản người dùng cho học sinh với mật khẩu mặc định và vai trò học sinh.
+     */
     private function createStudentAccount(Student $student): User
     {
         $user = User::create([
@@ -2429,6 +2724,9 @@ class SchoolController extends Controller
         return $user;
     }
 
+    /**
+     * Tạo tài khoản người dùng cho giáo viên và gán vai trò theo chức năng chủ nhiệm, giảng dạy và môn phụ trách.
+     */
     private function createTeacherAccount(Request $request, Teacher $teacher): User
     {
         $user = User::create([

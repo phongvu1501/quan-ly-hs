@@ -28,7 +28,15 @@ class StoreStudentRequest extends FormRequest
                     $fail('Năm tuyển sinh phải có dạng YYYY-YYYY với hai năm liên tiếp.');
                 }
             }],
-            'status' => ['required', Rule::in(Student::STATUSES)],
+            'status' => [
+                'required',
+                Rule::in(Student::STATUSES),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === Student::STATUS_GRADUATED) {
+                        $fail('Không thể tạo mới học sinh ở trạng thái "Đã tốt nghiệp".');
+                    }
+                },
+            ],
             'notes' => ['nullable', 'string', 'max:5000'],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
