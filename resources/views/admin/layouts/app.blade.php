@@ -1193,7 +1193,7 @@
                 <span>
 
                     <span class="brand-name d-block">
-                        Quản lý trường học
+                        THPT Giao Thủy B
                     </span>
 
                     <span class="brand-caption d-block">

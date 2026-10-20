@@ -31,7 +31,7 @@ class TeacherPortalController extends Controller
         $schedule = $teacher->schedules()
             ->with(['class', 'subject', 'semester'])
             ->where('academic_year_id', $year?->id)
-            ->when($semester, fn ($query) => $query->where('semester_id', $semester->id))
+            ->when($semester, fn($query) => $query->where('semester_id', $semester->id))
             ->orderBy('weekday')
             ->orderBy('period')
             ->get();
@@ -48,7 +48,7 @@ class TeacherPortalController extends Controller
             'semester' => $semester,
             'assignments' => $assignments,
             'homeroomClasses' => $teacher->homeroomClasses()->with('grade')->withCount('enrollments')->where('academic_year_id', $year?->id)->get(),
-            'students' => $assignments->pluck('class')->filter()->flatMap(fn ($class) => $class->enrollments)->unique('student_id')->count(),
+            'students' => $assignments->pluck('class')->filter()->flatMap(fn($class) => $class->enrollments)->unique('student_id')->count(),
             'schedule' => $schedule,
             'announcements' => $announcements,
             'upcomingExams' => $upcomingExams,
@@ -69,7 +69,7 @@ class TeacherPortalController extends Controller
         $classIds = $classes->pluck('id');
         $schedule = Schedule::with(['class', 'subject', 'teacher'])
             ->whereIn('class_id', $classIds)
-            ->when($semester, fn ($query) => $query->where('semester_id', $semester->id))
+            ->when($semester, fn($query) => $query->where('semester_id', $semester->id))
             ->orderBy('weekday')
             ->orderBy('period')
             ->get();
@@ -110,7 +110,7 @@ class TeacherPortalController extends Controller
         $schedule = $teacher->schedules()
             ->with(['class', 'subject'])
             ->where('academic_year_id', $year?->id)
-            ->when($semester, fn ($query) => $query->where('semester_id', $semester->id))
+            ->when($semester, fn($query) => $query->where('semester_id', $semester->id))
             ->orderBy('weekday')
             ->orderBy('period')
             ->get();
@@ -118,7 +118,7 @@ class TeacherPortalController extends Controller
         $announcements = $this->teacherAnnouncements($classIds);
         $upcomingExams = $this->teacherExams($year, $semester, $classIds, $assignments);
         $invigilationNotifications = $this->teacherInvigilationNotifications();
-        $studentCount = $assignments->pluck('class')->filter()->flatMap(fn ($class) => $class->enrollments)->unique('student_id')->count();
+        $studentCount = $assignments->pluck('class')->filter()->flatMap(fn($class) => $class->enrollments)->unique('student_id')->count();
 
         return view('teacher.subject', compact('teacher', 'year', 'semester', 'assignments', 'schedule', 'announcements', 'upcomingExams', 'studentCount', 'invigilationNotifications'));
     }
@@ -129,30 +129,44 @@ class TeacherPortalController extends Controller
         $year = $this->currentYear();
         $assignments = $teacher->assignments()->with(['class.grade', 'subject', 'semester'])->where('academic_year_id', $year?->id)->where('status', 'active')->get();
         $assignment = $assignments->firstWhere('id', (int) $request->assignment_id) ?: $assignments->first();
-        $students = $assignment?->class()->with(['enrollments' => fn ($query) => $query
+        $studentQuery = $assignment?->class()->with(['enrollments' => fn($query) => $query
             ->with('student')->where('status', 'active')
-            ->whereHas('student', fn ($student) => $student->where('status', Student::STATUS_STUDYING))])
-            ->first()?->enrollments ?? collect();
+            ->whereHas('student', fn($student) => $student->where('status', Student::STATUS_STUDYING))])
+            ->first()?->enrollments();
+        $allStudents = $studentQuery?->with('student')->where('status', 'active')
+            ->whereHas('student', fn($student) => $student->where('status', Student::STATUS_STUDYING))
+            ->orderBy('roll_number')->get() ?? collect();
+        $students = $studentQuery?->with('student')->where('status', 'active')
+            ->whereHas('student', fn($student) => $student->where('status', Student::STATUS_STUDYING))
+            ->orderBy('roll_number')->paginate(15)->withQueryString() ?? collect();
         $semesterId = $assignment?->semester_id ?: $this->currentSemester($year)?->id;
 
         $scoreMap = $assignment ? Score::where('assignment_id', $assignment->id)
-            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
-            ->whereIn('student_id', $students->pluck('student_id'))
+            ->when($semesterId, fn($query) => $query->where('semester_id', $semesterId))
+            ->whereIn('student_id', $allStudents->pluck('student_id'))
             ->latest('assessed_on')->latest()->get()->groupBy('student_id') : collect();
 
         $classScores = $assignment ? Score::where('academic_year_id', $year?->id)
             ->where('class_id', $assignment->class_id)
-            ->when($semesterId, fn ($query) => $query->where('semester_id', $semesterId))
+            ->when($semesterId, fn($query) => $query->where('semester_id', $semesterId))
             ->get() : collect();
         $academicSummaries = $this->academicSummaries($classScores);
-        $subjectAverages = $scoreMap->map(fn ($scores) => $this->weightedAverage($scores));
-        $classAverage = $academicSummaries->pluck('average')->filter(fn ($average) => $average !== null)->avg();
-        $topStudentId = $academicSummaries->filter(fn ($summary) => $summary['average'] !== null)->sortByDesc('average')->keys()->first();
-        $topStudent = $students->firstWhere('student_id', $topStudentId)?->student;
+        $subjectAverages = $scoreMap->map(fn($scores) => $this->weightedAverage($scores));
+        $classAverage = $academicSummaries->pluck('average')->filter(fn($average) => $average !== null)->avg();
+        $topStudentId = $academicSummaries->filter(fn($summary) => $summary['average'] !== null)->sortByDesc('average')->keys()->first();
+        $topStudent = $allStudents->firstWhere('student_id', $topStudentId)?->student;
 
         return view('teacher.scores', compact(
-            'teacher', 'assignments', 'assignment', 'students', 'scoreMap', 'subjectAverages',
-            'academicSummaries', 'classAverage', 'topStudent', 'semesterId'
+            'teacher',
+            'assignments',
+            'assignment',
+            'students',
+            'scoreMap',
+            'subjectAverages',
+            'academicSummaries',
+            'classAverage',
+            'topStudent',
+            'semesterId'
         ));
     }
 
@@ -186,7 +200,7 @@ class TeacherPortalController extends Controller
         abort_unless($assignment->class->enrollments()
             ->where('student_id', $data['student_id'])
             ->where('status', 'active')
-            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
+            ->whereHas('student', fn($query) => $query->where('status', Student::STATUS_STUDYING))
             ->exists(), 422, 'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.');
 
         $semesterId = $assignment->semester_id ?: Semester::where('academic_year_id', $assignment->academic_year_id)
@@ -225,9 +239,9 @@ class TeacherPortalController extends Controller
 
         $studentIds = $assignment->class->enrollments()
             ->where('status', 'active')
-            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
+            ->whereHas('student', fn($query) => $query->where('status', Student::STATUS_STUDYING))
             ->pluck('student_id')
-            ->map(fn ($id) => (int) $id);
+            ->map(fn($id) => (int) $id);
         $semesterId = $assignment->semester_id ?: Semester::where('academic_year_id', $assignment->academic_year_id)
             ->where('is_current', true)
             ->value('id');
@@ -270,7 +284,7 @@ class TeacherPortalController extends Controller
         abort_unless($assignment->class->enrollments()
             ->where('student_id', $score->student_id)
             ->where('status', 'active')
-            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
+            ->whereHas('student', fn($query) => $query->where('status', Student::STATUS_STUDYING))
             ->exists(), 422, 'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.');
 
         $data = $request->validate([
@@ -293,8 +307,8 @@ class TeacherPortalController extends Controller
         $class = $classes->firstWhere('id', (int) $request->class_id) ?: $classes->first();
         $date = $request->date('date') ?: today();
         $students = $class?->enrollments()->with('student')->where('status', 'active')
-            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
-            ->orderBy('roll_number')->get() ?? collect();
+            ->whereHas('student', fn($query) => $query->where('status', Student::STATUS_STUDYING))
+            ->orderBy('roll_number')->paginate(15)->withQueryString() ?? collect();
         $records = $class ? AttendanceRecord::where('class_id', $class->id)->whereDate('attended_on', $date)->get()->keyBy('student_id') : collect();
 
         return view('teacher.attendance', compact('teacher', 'classes', 'class', 'date', 'students', 'records'));
@@ -314,16 +328,19 @@ class TeacherPortalController extends Controller
             ->where('academic_year_id', $this->currentYear()?->id)
             ->find($data['class_id'])
             ?: $teacher->assignments()
-                ->where('academic_year_id', $this->currentYear()?->id)
-                ->where('status', 'active')
-                ->where('class_id', $data['class_id'])
-                ->firstOrFail()
-                ->class;
+            ->where('academic_year_id', $this->currentYear()?->id)
+            ->where('status', 'active')
+            ->where('class_id', $data['class_id'])
+            ->firstOrFail()
+            ->class;
 
         foreach ($data['statuses'] as $studentId => $status) {
-            abort_unless($class->enrollments()->where('student_id', $studentId)->where('status', 'active')
-                ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))->exists(), 422,
-                'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.');
+            abort_unless(
+                $class->enrollments()->where('student_id', $studentId)->where('status', 'active')
+                    ->whereHas('student', fn($query) => $query->where('status', Student::STATUS_STUDYING))->exists(),
+                422,
+                'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.'
+            );
             AttendanceRecord::firstOrCreate(
                 ['class_id' => $class->id, 'student_id' => $studentId, 'attended_on' => $data['attended_on'], 'period' => null, 'subject_id' => null],
                 ['academic_year_id' => $this->currentYear()?->id, 'status' => $status, 'reason' => $data['reasons'][$studentId] ?? null, 'recorded_by' => auth()->id()]
@@ -340,14 +357,17 @@ class TeacherPortalController extends Controller
             ->where('academic_year_id', $this->currentYear()?->id)
             ->find($attendance->class_id)
             ?: $teacher->assignments()
-                ->where('academic_year_id', $this->currentYear()?->id)
-                ->where('status', 'active')
-                ->where('class_id', $attendance->class_id)
-                ->firstOrFail()
-                ->class;
-        abort_unless($class->enrollments()->where('student_id', $attendance->student_id)->where('status', 'active')
-            ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))->exists(), 422,
-            'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.');
+            ->where('academic_year_id', $this->currentYear()?->id)
+            ->where('status', 'active')
+            ->where('class_id', $attendance->class_id)
+            ->firstOrFail()
+            ->class;
+        abort_unless(
+            $class->enrollments()->where('student_id', $attendance->student_id)->where('status', 'active')
+                ->whereHas('student', fn($query) => $query->where('status', Student::STATUS_STUDYING))->exists(),
+            422,
+            'Học sinh không ở trạng thái đang học hoặc không thuộc lớp được phân công.'
+        );
 
         $data = $request->validate([
             'attended_on' => ['required', 'date'],
@@ -401,28 +421,38 @@ class TeacherPortalController extends Controller
 
         $students = $class
             ? $class->enrollments()
-                ->with('student')
-                ->where('academic_year_id', $year?->id)
-                ->where('status', 'active')
-                ->whereHas('student', fn ($query) => $query->where('status', Student::STATUS_STUDYING))
-                ->orderBy('roll_number')
-                ->get()
+            ->with('student')
+            ->where('academic_year_id', $year?->id)
+            ->where('status', 'active')
+            ->whereHas('student', fn($query) => $query->where('status', Student::STATUS_STUDYING))
+            ->orderBy('roll_number')
+            ->paginate(15)
+            ->withQueryString()
             : collect();
         $commentMap = $students->isNotEmpty() && $year && $selectedSemester
             ? TeacherComment::with(['subject', 'teacher'])
-                ->where('academic_year_id', $year->id)
-                ->where('semester_id', $selectedSemester->id)
-                ->whereIn('student_id', $students->pluck('student_id'))
-                ->when($subjectId, fn ($query) => $query->where('subject_id', $subjectId), fn ($query) => $query->whereNull('subject_id'))
-                ->latest()
-                ->get()
-                ->groupBy('student_id')
-                ->map->first()
+            ->where('academic_year_id', $year->id)
+            ->where('semester_id', $selectedSemester->id)
+            ->whereIn('student_id', $students->pluck('student_id'))
+            ->when($subjectId, fn($query) => $query->where('subject_id', $subjectId), fn($query) => $query->whereNull('subject_id'))
+            ->latest()
+            ->get()
+            ->groupBy('student_id')
+            ->map->first()
             : collect();
 
         return view('teacher.comments', compact(
-            'teacher', 'year', 'semester', 'semesterOptions', 'selectedSemester',
-            'classes', 'class', 'subjects', 'subjectId', 'students', 'commentMap'
+            'teacher',
+            'year',
+            'semester',
+            'semesterOptions',
+            'selectedSemester',
+            'classes',
+            'class',
+            'subjects',
+            'subjectId',
+            'students',
+            'commentMap'
         ));
     }
 
@@ -463,7 +493,7 @@ class TeacherPortalController extends Controller
             ->where(function ($query) use ($semester): void {
                 $query->whereNull('semester_id')->orWhere('semester_id', $semester->id);
             })
-            ->when($data['subject_id'], fn ($query, $subjectId) => $query->where('subject_id', $subjectId))
+            ->when($data['subject_id'], fn($query, $subjectId) => $query->where('subject_id', $subjectId))
             ->exists();
 
         abort_unless($isHomeroomTeacher || $hasTeachingAssignment, 403, 'Bạn không được phân công cho học sinh này.');
@@ -501,7 +531,7 @@ class TeacherPortalController extends Controller
 
         $studentIds = $classIds->contains((int) $data['class_id'])
             ? Student::where('status', Student::STATUS_STUDYING)
-                ->whereHas('enrollments', fn ($query) => $query->where('class_id', $data['class_id'])->where('academic_year_id', $year->id)->where('status', 'active'))->pluck('id')
+            ->whereHas('enrollments', fn($query) => $query->where('class_id', $data['class_id'])->where('academic_year_id', $year->id)->where('status', 'active'))->pluck('id')
             : collect();
         $saved = 0;
         foreach ($data['comments'] as $studentId => $row) {
@@ -523,7 +553,7 @@ class TeacherPortalController extends Controller
                 ->where(function ($query) use ($semester): void {
                     $query->whereNull('semester_id')->orWhere('semester_id', $semester->id);
                 })
-                ->when($data['subject_id'], fn ($query, $subjectId) => $query->where('subject_id', $subjectId))
+                ->when($data['subject_id'], fn($query, $subjectId) => $query->where('subject_id', $subjectId))
                 ->exists();
             abort_unless($isHomeroomTeacher || $hasTeachingAssignment, 403, 'Bạn không được phân công cho học sinh này.');
 
@@ -589,8 +619,8 @@ class TeacherPortalController extends Controller
     {
         return $scores->groupBy('student_id')->map(function ($studentScores): array {
             $subjectAverages = $studentScores->groupBy('subject_id')
-                ->map(fn ($subjectScores) => $this->weightedAverage($subjectScores))
-                ->filter(fn ($average) => $average !== null)
+                ->map(fn($subjectScores) => $this->weightedAverage($subjectScores))
+                ->filter(fn($average) => $average !== null)
                 ->values();
             $average = $subjectAverages->isNotEmpty() ? round((float) $subjectAverages->avg(), 2) : null;
             $lowestSubject = $subjectAverages->isNotEmpty() ? (float) $subjectAverages->min() : null;
@@ -672,7 +702,7 @@ class TeacherPortalController extends Controller
 
         return Exam::with(['subject', 'class'])
             ->where('academic_year_id', $year?->id)
-            ->when($semester, fn ($query) => $query->where('semester_id', $semester->id))
+            ->when($semester, fn($query) => $query->where('semester_id', $semester->id))
             ->whereDate('exam_date', '>=', today())
             ->where(function ($query) use ($classIds, $subjectIds): void {
                 $query->whereNull('class_id')->orWhereIn('class_id', $classIds);

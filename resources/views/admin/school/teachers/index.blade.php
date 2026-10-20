@@ -92,7 +92,7 @@
                 </div>
                 <div class="col-12 d-flex justify-content-end">
                     <button class="btn btn-primary" type="submit">
-                        <i data-lucide="search"></i><span>Áp dụng</span>
+                        <i data-lucide="search"></i><span>Lọc</span>
                     </button>
                 </div>
             </form>

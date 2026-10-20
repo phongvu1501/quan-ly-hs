@@ -114,7 +114,7 @@
                     </button>
 
                     <a href="{{ url()->current() }}" class="btn btn-light" title="Xóa bộ lọc" aria-label="Xóa bộ lọc">
-                        <i data-lucide="rotate-ccw"></i>
+                        <i data-lucide="rotate-ccw"></i>Đặt lại
                     </a>
                 </div>
             </div>

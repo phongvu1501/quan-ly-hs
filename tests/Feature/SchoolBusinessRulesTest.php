@@ -70,7 +70,8 @@ class SchoolBusinessRulesTest extends TestCase
         [$year, $semester, $classA, $classB] = $this->schoolContext();
         $user = User::factory()->create();
         $role = Role::firstOrCreate(['slug' => 'student'], ['name' => 'Student']);
-        $permissions = collect(['student.dashboard', 'student-fees.view'])->map(fn (string $slug) =>
+        $permissions = collect(['student.dashboard', 'student-fees.view'])->map(
+            fn(string $slug) =>
             Permission::firstOrCreate(['slug' => $slug], ['name' => $slug])
         );
         $role->permissions()->syncWithoutDetaching($permissions->pluck('id'));
@@ -150,6 +151,29 @@ class SchoolBusinessRulesTest extends TestCase
             ->assertSee('operationsModal')
             ->assertSee('School tuition');
         $this->assertSame(100000.0, (float) $response->viewData('outstandingFees'));
+    }
+
+    public function test_class_names_are_sorted_naturally_by_number(): void
+    {
+        $grade = Grade::create(['level' => 10, 'name' => 'Grade 10']);
+        $year = AcademicYear::create([
+            'name' => '2027-2028',
+            'code' => '2027-2028',
+            'starts_on' => '2027-08-01',
+            'ends_on' => '2028-05-31',
+            'is_current' => false,
+        ]);
+
+        SchoolClass::insert([
+            ['academic_year_id' => $year->id, 'grade_id' => $grade->id, 'code' => '10A11', 'name' => '10A11', 'status' => 'active'],
+            ['academic_year_id' => $year->id, 'grade_id' => $grade->id, 'code' => '10A2', 'name' => '10A2', 'status' => 'active'],
+            ['academic_year_id' => $year->id, 'grade_id' => $grade->id, 'code' => '10A1', 'name' => '10A1', 'status' => 'active'],
+            ['academic_year_id' => $year->id, 'grade_id' => $grade->id, 'code' => '10A12', 'name' => '10A12', 'status' => 'active'],
+        ]);
+
+        $names = SchoolClass::naturalSort(SchoolClass::query()->get())->pluck('name')->all();
+
+        $this->assertSame(['10A1', '10A2', '10A11', '10A12'], $names);
     }
 
     private function schoolContext(): array

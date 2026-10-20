@@ -34,7 +34,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-2"><button class="btn btn-primary w-100" type="submit"><i data-lucide="search"></i><span>Áp dụng</span></button></div>
+                <div class="col-md-2"><button class="btn btn-primary w-100" type="submit"><i data-lucide="search"></i><span>Lọc</span></button></div>
             </form>
         </div>
     </section>
@@ -42,7 +42,7 @@
     <section class="card table-card" aria-label="Danh sách giáo viên chủ nhiệm">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead><tr><th>Giáo viên</th><th>Lớp chủ nhiệm</th><th>Năm học</th><th>Trạng thái</th><th class="text-end">Thao tác</th></tr></thead>
+                <thead><tr><th>Giáo viên</th><th>Lớp chủ nhiệm</th><th>Năm học</th><th>Trạng thái</th><th class="text-end">Chi tiết</th></tr></thead>
                 <tbody>
                     @forelse ($teachers as $teacher)
                         @foreach ($teacher->homeroomClasses as $class)

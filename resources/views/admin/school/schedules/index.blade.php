@@ -435,7 +435,7 @@
             <div class="schedule-filter-actions">
                 <button class="btn btn-primary" type="submit"><i data-lucide="filter"></i> Lọc</button>
                 <a class="btn btn-light" href="{{ route('admin.school.schedules.index') }}" title="Đặt lại bộ lọc"><i
-                        data-lucide="rotate-ccw"></i><span class="visually-hidden">Đặt lại</span></a>
+                        data-lucide="rotate-ccw"></i><span class="visually-hidden"></span>Đặt lại</a>
             </div>
         </form>
         <div class="schedule-summary">

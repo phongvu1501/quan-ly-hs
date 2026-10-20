@@ -299,13 +299,13 @@
         <section class="intro">
             <div class="brand"><span class="brand-mark"><i data-lucide="school"></i></span>Quản lý trường học</div>
             <div class="intro-copy">
-                <p class="eyebrow">Khu vực nội bộ</p>
+                <p class="eyebrow">Trường THPT Giao Thủy B</p>
                 <h1>Cổng thông tin nội bộ nhà trường.</h1>
                 <p>Không gian làm việc dành cho cán bộ, giáo viên và học sinh.</p>
             </div>
             <div class="points">
-                <div class="point"><span class="point-icon"><i data-lucide="shield-check"></i></span>Truy cập theo phân quyền</div>
-                <div class="point"><span class="point-icon"><i data-lucide="layout-dashboard"></i></span>Dữ liệu học vụ tập trung</div>
+                <div class="point"><span class="point-icon"><i data-lucide="shield-check"></i></span>Sở giáo dục và đào tạo</div>
+                <div class="point"><span class="point-icon"><i data-lucide="layout-dashboard"></i></span>Quản lý thông tin học sinh</div>
             </div>
         </section>
         <section class="form-side">

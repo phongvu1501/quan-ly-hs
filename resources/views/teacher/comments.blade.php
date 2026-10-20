@@ -75,7 +75,7 @@
                     <input type="hidden" name="subject_id" value="{{ $subjectId }}">
                     <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
             @endif
-                <div class="table-responsive">
+            <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead>
                         <tr>
@@ -98,7 +98,8 @@
                                     @if ($comment)
                                         <p class="mb-1">{{ $comment->content }}</p>
                                         <small class="text-secondary">
-                                            {{ $comment->teacher?->full_name ?: 'Giáo viên' }} · {{ $comment->created_at?->format('d/m/Y H:i') }}
+                                            {{ $comment->teacher?->full_name ?: 'Giáo viên' }} ·
+                                            {{ $comment->created_at?->format('d/m/Y H:i') }}
                                         </small>
                                     @else
                                         <span class="text-secondary">Chưa có nhận xét</span>
@@ -129,36 +130,41 @@
                         @endforelse
                     </tbody>
                 </table>
-                </div>
-                @if ($canCreateComments)
-                    <div class="p-3 border-top d-flex justify-content-end"><button class="btn btn-primary" type="submit"><i
-                                data-lucide="save"></i> Lưu toàn bộ nhận xét</button></div>
-                    </form>
-                @endif
+            </div>
+            @if ($canCreateComments)
+                <div class="p-3 border-top d-flex justify-content-end"><button class="btn btn-primary" type="submit"><i
+                            data-lucide="save"></i> Lưu toàn bộ nhận xét</button></div>
+                </form>
+            @endif
+            @if ($students->hasPages())
+                <div class="p-3 border-top">{{ $students->links('pagination::bootstrap-5') }}</div>
+            @endif
         </div>
 
         @if ($canEditComments)
-            <div class="modal fade" id="commentEditModal" tabindex="-1" aria-labelledby="commentEditTitle" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 class="modal-title fs-5" id="commentEditTitle">Sửa nhận xét</h2>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            <div class="modal fade" id="commentEditModal" tabindex="-1" aria-labelledby="commentEditTitle"
+                aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title fs-5" id="commentEditTitle">Sửa nhận xét</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                        </div>
+                        <form id="commentEditForm" method="POST">
+                            @csrf
+                            @method('PUT')
+                            <div class="modal-body">
+                                <label class="form-label" for="commentEditContent">Nội dung nhận xét</label>
+                                <textarea id="commentEditContent" name="content" class="form-control" rows="6" maxlength="3000" required></textarea>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Cập nhật nhận
+                                    xét</button>
+                            </div>
+                        </form>
                     </div>
-                    <form id="commentEditForm" method="POST">
-                        @csrf
-                        @method('PUT')
-                        <div class="modal-body">
-                            <label class="form-label" for="commentEditContent">Nội dung nhận xét</label>
-                            <textarea id="commentEditContent" name="content" class="form-control" rows="6" maxlength="3000" required></textarea>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
-                            <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Cập nhật nhận xét</button>
-                        </div>
-                    </form>
                 </div>
-            </div>
             </div>
         @endif
     @else
